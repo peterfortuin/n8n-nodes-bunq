@@ -1,0 +1,42 @@
+# Dependabot configuration for automated dependency updates
+# Documentation: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Monitor npm dependencies for package.json
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    # Limit the number of open pull requests for npm dependencies
+    open-pull-requests-limit: 5
+    # Cooldown period: wait 7 days between dependency updates
+    cooldown:
+      default-days: 7
+    # Group all npm dependencies into a single PR when possible
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+
+  # Monitor GitHub Actions for workflow dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    # Limit the number of open pull requests for GitHub Actions
+    open-pull-requests-limit: 5
+    # Cooldown period: wait 7 days between dependency updates
+    cooldown:
+      default-days: 7
+    # Group all GitHub Actions updates into a single PR when possible
+    groups:
+      github-actions:
+        patterns:
+          - "*"
