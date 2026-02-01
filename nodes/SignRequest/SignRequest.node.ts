@@ -6,11 +6,13 @@ import {
 } from 'n8n-workflow';
 import * as crypto from 'crypto';
 
-export class BunqSignRequest implements INodeType {
+// eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
+export class SignRequest implements INodeType {
+  usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Signing',
     name: 'signRequest',
-    icon: { light: 'file:Bunq-logo.svg', dark: 'file:Bunq-logo.svg' },
+    icon: 'file:Bunq-logo.svg',
     group: ['transform'],
     version: 1,
     description: 'Signs a request body using a private key credential',
@@ -21,7 +23,7 @@ export class BunqSignRequest implements INodeType {
     outputs: ['main'],
     credentials: [
       {
-        name: 'bunqDevicePrivateKey',
+        name: 'bunqDevicePrivateKeyApi',
         required: true,
       },
     ],
@@ -44,8 +46,8 @@ export class BunqSignRequest implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    // Load private key from bunqDevicePrivateKey credential
-    const credentials = await this.getCredentials('bunqDevicePrivateKey');
+    // Load private key from bunqDevicePrivateKeyApi credential
+    const credentials = await this.getCredentials('bunqDevicePrivateKeyApi');
     const privateKey = credentials.privateKey as string;
 
     for (let i = 0; i < items.length; i++) {
