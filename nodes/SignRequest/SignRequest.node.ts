@@ -7,7 +7,7 @@ import {
 import * as crypto from 'crypto';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
-export class BunqSignRequest implements INodeType {
+export class SignRequest implements INodeType {
   usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Signing',
