@@ -9,7 +9,7 @@ export class BunqDevicePrivateKeyApi implements ICredentialType {
   name = 'bunqDevicePrivateKeyApi';
   displayName = 'Bunq Device Private Key API';
   documentationUrl = 'https://doc.bunq.com';
-  icon: Icon = 'file:Bunq-logo.svg';
+  icon: Icon = 'file:../assets/Bunq-logo.svg';
   test: ICredentialTestRequest = {
     request: {
       baseURL: 'https://api.bunq.com',
