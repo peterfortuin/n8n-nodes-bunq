@@ -7,7 +7,6 @@ import {
 import * as crypto from 'crypto';
 
 export class BunqSignRequest implements INodeType {
-  usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Signing',
     name: 'signRequest',
@@ -39,7 +38,7 @@ export class BunqSignRequest implements INodeType {
         required: true,
       }
     ],
-		usableAsTool: true
+    usableAsTool: true
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
