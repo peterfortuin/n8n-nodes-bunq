@@ -7,7 +7,7 @@ import {
 import * as crypto from 'crypto';
 
 export class BunqSignRequest implements INodeType {
-  usableAsTool = true;
+  usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Signing',
     name: 'signRequest',
