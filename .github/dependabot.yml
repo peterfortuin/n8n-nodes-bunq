@@ -13,13 +13,14 @@ updates:
       timezone: "UTC"
     # Limit the number of open pull requests for npm dependencies
     open-pull-requests-limit: 5
+    # Cooldown period: wait 7 days between dependency updates
+    cooldown:
+      default-days: 7
     # Group all npm dependencies into a single PR when possible
     groups:
       npm-dependencies:
         patterns:
           - "*"
-    # Apply a minimum time between PR creation to avoid spam (7 days enforced by weekly schedule)
-    # The weekly schedule inherently provides a 7-day cooldown between update checks
 
   # Monitor GitHub Actions for workflow dependencies
   - package-ecosystem: "github-actions"
@@ -31,9 +32,11 @@ updates:
       timezone: "UTC"
     # Limit the number of open pull requests for GitHub Actions
     open-pull-requests-limit: 5
+    # Cooldown period: wait 7 days between dependency updates
+    cooldown:
+      default-days: 7
     # Group all GitHub Actions updates into a single PR when possible
     groups:
       github-actions:
         patterns:
           - "*"
-    # The weekly schedule inherently provides a 7-day cooldown between update checks
