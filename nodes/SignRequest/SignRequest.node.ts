@@ -12,7 +12,7 @@ export class SignRequest implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Bunq Signing',
     name: 'signRequest',
-    icon: 'file:Bunq-logo.svg',
+    icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
     description: 'Signs a request body using a private key credential',
