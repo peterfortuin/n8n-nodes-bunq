@@ -6,7 +6,9 @@ import {
 } from 'n8n-workflow';
 import * as crypto from 'crypto';
 
+// eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class BunqSignRequest implements INodeType {
+  usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Signing',
     name: 'signRequest',
@@ -37,8 +39,7 @@ export class BunqSignRequest implements INodeType {
         description: 'Paste the request body to be signed (any string)',
         required: true,
       }
-    ],
-    usableAsTool: true
+    ]
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
