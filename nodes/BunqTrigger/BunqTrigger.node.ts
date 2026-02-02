@@ -13,6 +13,7 @@ import {
 } from '../../utils/bunqApiHelpers';
 
 
+// eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class BunqTrigger implements INodeType {
 	usableAsTool: boolean = false;
 	description: INodeTypeDescription = {
@@ -138,7 +139,6 @@ export class BunqTrigger implements INodeType {
 				description: 'The types of events you want to receive webhook notifications for',
 			},
 		],
-		usableAsTool: true,
 	};
 
 	// Helper method to ensure Bunq session for webhook operations
@@ -310,8 +310,11 @@ export class BunqTrigger implements INodeType {
 							}
 						}
 					}
-				} catch {
+				} catch (error) {
 					// If we can't check, assume it doesn't exist
+					// This can happen if the session is invalid or the API is unreachable
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.debug(`Failed to check webhook existence: ${message}`);
 					return false;
 				}
 
@@ -455,8 +458,11 @@ export class BunqTrigger implements INodeType {
 					});
 
 					return true;
-				} catch {
-					// If deletion fails, log but don't throw - webhook might already be gone
+				} catch (error) {
+					// If deletion fails, don't throw - webhook might already be gone
+					// Log for debugging but consider deletion successful
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.debug(`Failed to delete webhook (may already be deleted): ${message}`);
 					return true;
 				}
 			},
