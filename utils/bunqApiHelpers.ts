@@ -79,6 +79,10 @@ export async function createInstallation(
 
 /**
  * Register device with Bunq API
+ * Note: By omitting the permitted_ips field, Bunq will automatically lock the device
+ * to the IP address of the caller. This provides better security but requires that
+ * API calls come from the same IP address. If your IP changes (e.g., dynamic IPs,
+ * mobile networks, VPN), you'll need to re-register the device.
  */
 export async function registerDevice(
   this: IExecuteFunctions,
@@ -87,7 +91,7 @@ export async function registerDevice(
   apiKey: string,
   serviceName: string
 ): Promise<string> {
-  // Device will be locked to the IP address of the caller for better security
+  // By not including permitted_ips, Bunq automatically locks device to caller's IP
   const payload = JSON.stringify({
     description: serviceName,
     secret: apiKey,
