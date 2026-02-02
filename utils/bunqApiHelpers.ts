@@ -1,4 +1,4 @@
-import { IExecuteFunctions, IHookFunctions, NodeApiError } from 'n8n-workflow';
+import { IExecuteFunctions, IHookFunctions, ICredentialDataDecryptedObject, NodeApiError } from 'n8n-workflow';
 import * as crypto from 'crypto';
 
 /**
@@ -226,18 +226,21 @@ export interface IBunqSessionData {
  * Each step is only performed if required (e.g., installation only if no token exists).
  * 
  * @param executeFunctions - The n8n execution context (IExecuteFunctions or IHookFunctions)
- * @param credentials - The Bunq API credentials object
+ * @param credentials - The Bunq API credentials object from getCredentials('bunqApi')
  * @param serviceName - Name of the service/application
  * @param forceRecreate - Whether to force recreation of the session
  * @returns Session data with all tokens and IDs
  */
 export async function ensureBunqSession(
   this: BunqApiContext,
-  credentials: { apiKey: string; privateKey: string; publicKey: string; environment: string },
+  credentials: ICredentialDataDecryptedObject,
   serviceName: string,
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
-  const { apiKey, privateKey, publicKey, environment } = credentials;
+  const apiKey = credentials.apiKey as string;
+  const privateKey = credentials.privateKey as string;
+  const publicKey = credentials.publicKey as string;
+  const environment = credentials.environment as string;
   const baseUrl = getBunqBaseUrl(environment);
 
   // Get or initialize session data from workflow static data

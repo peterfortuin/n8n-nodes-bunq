@@ -166,12 +166,7 @@ export class BunqTrigger implements INodeType {
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						{
-							apiKey: credentials.apiKey as string,
-							privateKey: credentials.privateKey as string,
-							publicKey: credentials.publicKey as string,
-							environment,
-						},
+						credentials,
 						'n8n-bunq-webhook',
 						false,
 					);
@@ -245,12 +240,7 @@ export class BunqTrigger implements INodeType {
 				// Ensure session exists using shared helper
 				const sessionData = await ensureBunqSession.call(
 					this,
-					{
-						apiKey: credentials.apiKey as string,
-						privateKey: credentials.privateKey as string,
-						publicKey: credentials.publicKey as string,
-						environment,
-					},
+					credentials,
 					'n8n-bunq-webhook',
 					false,
 				);
@@ -328,12 +318,7 @@ export class BunqTrigger implements INodeType {
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						{
-							apiKey: credentials.apiKey as string,
-							privateKey: credentials.privateKey as string,
-							publicKey: credentials.publicKey as string,
-							environment,
-						},
+						credentials,
 						'n8n-bunq-webhook',
 						false,
 					);
