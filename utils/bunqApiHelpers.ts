@@ -202,3 +202,94 @@ export function isSessionExpired(createdAt: number): boolean {
   const maxAge = 89 * 24 * 60 * 60 * 1000; // 89 days in milliseconds
   return (Date.now() - createdAt) > maxAge;
 }
+
+/**
+ * Session data interface
+ */
+export interface IBunqSessionData {
+  installationToken?: string;
+  serverPublicKey?: string;
+  deviceServerId?: string;
+  sessionToken?: string;
+  sessionCreatedAt?: number;
+  userId?: string;
+}
+
+/**
+ * Ensure Bunq session is created and valid
+ * This function manages the complete session lifecycle: installation, device registration, and session creation.
+ * Each step is only performed if required (e.g., installation only if no token exists).
+ * 
+ * @param executeFunctions - The n8n execution context
+ * @param apiKey - The Bunq API key
+ * @param privateKey - RSA private key in PEM format
+ * @param publicKey - RSA public key in PEM format
+ * @param environment - Environment ('sandbox' or 'production')
+ * @param serviceName - Name of the service/application
+ * @param forceRecreate - Whether to force recreation of the session
+ * @returns Session data with all tokens and IDs
+ */
+export async function ensureBunqSession(
+  this: IExecuteFunctions,
+  apiKey: string,
+  privateKey: string,
+  publicKey: string,
+  environment: string,
+  serviceName: string,
+  forceRecreate: boolean = false
+): Promise<IBunqSessionData> {
+  const baseUrl = getBunqBaseUrl(environment);
+
+  // Get or initialize session data from workflow static data
+  const workflowStaticData = this.getWorkflowStaticData('node');
+  let sessionData: IBunqSessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
+
+  // If force recreate is true, clear all session data
+  if (forceRecreate) {
+    sessionData = {};
+    workflowStaticData.bunqSession = sessionData;
+  }
+
+  // Step 1: Create installation if needed
+  if (!sessionData.installationToken || !sessionData.serverPublicKey) {
+    const installationResult = await createInstallation.call(this, baseUrl, publicKey, serviceName);
+    sessionData.installationToken = installationResult.token;
+    sessionData.serverPublicKey = installationResult.serverPublicKey;
+    workflowStaticData.bunqSession = sessionData;
+  }
+
+  // Step 2: Register device if needed
+  if (!sessionData.deviceServerId) {
+    const deviceId = await registerDevice.call(
+      this,
+      baseUrl,
+      sessionData.installationToken!,
+      apiKey,
+      serviceName
+    );
+    sessionData.deviceServerId = deviceId;
+    workflowStaticData.bunqSession = sessionData;
+  }
+
+  // Step 3: Create session if needed or if expired
+  const shouldCreateSession = !sessionData.sessionToken || 
+    !sessionData.sessionCreatedAt ||
+    isSessionExpired(sessionData.sessionCreatedAt);
+
+  if (shouldCreateSession) {
+    const sessionResult = await createSession.call(
+      this,
+      baseUrl,
+      sessionData.installationToken!,
+      apiKey,
+      serviceName,
+      privateKey
+    );
+    sessionData.sessionToken = sessionResult.token;
+    sessionData.sessionCreatedAt = Date.now();
+    sessionData.userId = sessionResult.userId;
+    workflowStaticData.bunqSession = sessionData;
+  }
+
+  return sessionData;
+}
