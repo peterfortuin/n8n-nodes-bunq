@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-bunq",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "n8n community node for Bunq request signing with device private keys",
     "license": "MIT",
     "homepage": "",
@@ -36,7 +36,9 @@
         "nodes": [
             "dist/nodes/BunqSession/BunqSession.node.js",
             "dist/nodes/SignRequest/SignRequest.node.js",
-            "dist/nodes/BunqTrigger/BunqTrigger.node.js"
+            "dist/nodes/BunqTrigger/BunqTrigger.node.js",
+            "dist/nodes/FailedCallbackList/FailedCallbackList.node.js",
+            "dist/nodes/RetryFailedCallback/RetryFailedCallback.node.js"
         ]
     },
     "devDependencies": {
