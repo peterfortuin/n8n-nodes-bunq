@@ -73,6 +73,9 @@ export async function registerDevice(
   serviceName: string,
   privateKey: string
 ): Promise<string> {
+  // Using wildcard IP ('*') to allow API calls from any IP address.
+  // This is recommended by Bunq for Wildcard API Keys to avoid IP binding issues.
+  // See: https://doc.bunq.com/tutorials/your-first-payment/creating-the-api-context/device-registration
   const payload = JSON.stringify({
     description: serviceName,
     secret: apiKey,
