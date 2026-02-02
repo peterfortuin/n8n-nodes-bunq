@@ -43,7 +43,6 @@ export async function createInstallation(
     'User-Agent': serviceName,
     'X-Bunq-Language': 'en_US',
     'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Geolocation': '0 0 0 0 000',
     'Cache-Control': 'no-cache',
   };
 
@@ -86,19 +85,13 @@ export async function registerDevice(
   baseUrl: string,
   installationToken: string,
   apiKey: string,
-  serviceName: string,
-  privateKey: string
+  serviceName: string
 ): Promise<string> {
-  // Using wildcard IP ('*') to allow API calls from any IP address.
-  // This is recommended by Bunq for Wildcard API Keys to avoid IP binding issues.
-  // See: https://doc.bunq.com/tutorials/your-first-payment/creating-the-api-context/device-registration
+  // Device will be locked to the IP address of the caller for better security
   const payload = JSON.stringify({
     description: serviceName,
     secret: apiKey,
-    permitted_ips: ['*']
   });
-
-  const signature = signData(payload, privateKey);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -106,9 +99,7 @@ export async function registerDevice(
     'User-Agent': serviceName,
     'X-Bunq-Language': 'en_US',
     'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Geolocation': '0 0 0 0 000',
     'X-Bunq-Client-Authentication': installationToken,
-    'X-Bunq-Client-Signature': signature,
   };
 
   const response = await this.helpers.httpRequest({
@@ -159,7 +150,6 @@ export async function createSession(
     'User-Agent': serviceName,
     'X-Bunq-Language': 'en_US',
     'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Geolocation': '0 0 0 0 000',
     'X-Bunq-Client-Authentication': installationToken,
     'X-Bunq-Client-Signature': signature,
   };

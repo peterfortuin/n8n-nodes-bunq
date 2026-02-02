@@ -102,8 +102,7 @@ export class BunqSession implements INodeType {
             baseUrl,
             sessionData.installationToken!,
             apiKey,
-            serviceName,
-            privateKey
+            serviceName
           );
           sessionData.deviceServerId = deviceId;
           workflowStaticData.bunqSession = sessionData;
