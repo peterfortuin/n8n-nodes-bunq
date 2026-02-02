@@ -64,10 +64,12 @@ export class BunqSession implements INodeType {
       // Use the shared session management function
       const sessionData = await ensureBunqSession.call(
         this,
-        apiKey,
-        privateKey,
-        publicKey,
-        environment,
+        {
+          apiKey,
+          privateKey,
+          publicKey,
+          environment,
+        },
         serviceName,
         forceRecreate
       );

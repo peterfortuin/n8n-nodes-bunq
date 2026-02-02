@@ -226,23 +226,21 @@ export interface IBunqSessionData {
  * Each step is only performed if required (e.g., installation only if no token exists).
  * 
  * @param executeFunctions - The n8n execution context (IExecuteFunctions or IHookFunctions)
- * @param apiKey - The Bunq API key
- * @param privateKey - RSA private key in PEM format
- * @param publicKey - RSA public key in PEM format
- * @param environment - Environment ('sandbox' or 'production')
+ * @param credentials - The Bunq API credentials object
  * @param serviceName - Name of the service/application
  * @param forceRecreate - Whether to force recreation of the session
  * @returns Session data with all tokens and IDs
  */
 export async function ensureBunqSession(
   this: BunqApiContext,
-  apiKey: string,
-  privateKey: string,
-  publicKey: string,
-  environment: string,
+  credentials: { apiKey: string; privateKey: string; publicKey: string; environment: string },
   serviceName: string,
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
+  const apiKey = credentials.apiKey;
+  const privateKey = credentials.privateKey;
+  const publicKey = credentials.publicKey;
+  const environment = credentials.environment;
   const baseUrl = getBunqBaseUrl(environment);
 
   // Get or initialize session data from workflow static data

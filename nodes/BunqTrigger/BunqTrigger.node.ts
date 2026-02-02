@@ -44,9 +44,9 @@ export class BunqTrigger implements INodeType {
 		],
 		properties: [
 			{
-				displayName: 'Callback Categories',
-				name: 'categories',
-				type: 'multiOptions',
+				displayName: 'Callback Category',
+				name: 'category',
+				type: 'options',
 				options: [
 					{
 						name: 'Billing',
@@ -134,9 +134,9 @@ export class BunqTrigger implements INodeType {
 						description: 'Notifications for updates on Tab payments',
 					},
 				],
-				default: ['MUTATION'],
+				default: 'MUTATION',
 				required: true,
-				description: 'The types of events you want to receive webhook notifications for',
+				description: 'The type of event you want to receive webhook notifications for',
 			},
 		],
 	};
@@ -145,7 +145,9 @@ export class BunqTrigger implements INodeType {
 		default: {
 			async checkExists(this: IHookFunctions): Promise<boolean> {
 				const webhookUrl = this.getNodeWebhookUrl('default');
-				const categories = this.getNodeParameter('categories') as string[];
+				const category = this.getNodeParameter('category') as string;
+
+				this.logger.debug(`Checking if webhook exists for category: ${category}`);
 
 				try {
 					// Get credentials and session
@@ -153,20 +155,27 @@ export class BunqTrigger implements INodeType {
 					const environment = credentials.environment as string;
 					const baseUrl = getBunqBaseUrl(environment);
 
+					this.logger.debug(`Using ${environment} environment, base URL: ${baseUrl}`);
+
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						credentials.apiKey as string,
-						credentials.privateKey as string,
-						credentials.publicKey as string,
-						environment,
+						{
+							apiKey: credentials.apiKey as string,
+							privateKey: credentials.privateKey as string,
+							publicKey: credentials.publicKey as string,
+							environment,
+						},
 						'n8n-bunq-webhook',
 						false,
 					);
 
 					if (!sessionData.sessionToken || !sessionData.userId) {
+						this.logger.debug('No valid session found');
 						return false;
 					}
+
+					this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
 					// Get existing notification filters
 					const response = await this.helpers.httpRequest({
@@ -182,29 +191,32 @@ export class BunqTrigger implements INodeType {
 						},
 					});
 
-					// Check if our webhook exists with the correct categories
+					this.logger.debug(`Retrieved notification filters from Bunq API`);
+
+					// Check if our webhook exists with the correct category
 					if (response.Response && Array.isArray(response.Response)) {
 						for (const item of response.Response) {
 							if (item.NotificationFilterUrl) {
 								const filters = item.NotificationFilterUrl.notification_filters || [];
-								// Check if all our categories are registered with our webhook URL
-								const hasAllCategories = categories.every((cat) =>
-									filters.some(
-										(f: { category: string; notification_target: string }) =>
-											f.category === cat && f.notification_target === webhookUrl,
-									),
+								// Check if our category is registered with our webhook URL
+								const exists = filters.some(
+									(f: { category: string; notification_target: string }) =>
+										f.category === category && f.notification_target === webhookUrl,
 								);
-								if (hasAllCategories) {
+								if (exists) {
+									this.logger.debug(`Webhook exists for category ${category} at ${webhookUrl}`);
 									return true;
 								}
 							}
 						}
 					}
+
+					this.logger.debug(`Webhook does not exist for category ${category}`);
 				} catch (error) {
 					// If we can't check, assume it doesn't exist
 					// This can happen if the session is invalid or the API is unreachable
 					const message = error instanceof Error ? error.message : 'Unknown error';
-					this.logger.debug(`Failed to check webhook existence: ${message}`);
+					this.logger.error(`Failed to check webhook existence: ${message}`);
 					return false;
 				}
 
@@ -213,36 +225,45 @@ export class BunqTrigger implements INodeType {
 
 			async create(this: IHookFunctions): Promise<boolean> {
 				const webhookUrl = this.getNodeWebhookUrl('default');
-				const categories = this.getNodeParameter('categories') as string[];
+				const category = this.getNodeParameter('category') as string;
+
+				this.logger.info(`Creating webhook for category: ${category} at ${webhookUrl}`);
 
 				// Get credentials
 				const credentials = await this.getCredentials('bunqApi');
 				const environment = credentials.environment as string;
 				const baseUrl = getBunqBaseUrl(environment);
 
+				this.logger.debug(`Using ${environment} environment`);
+
 				// Ensure session exists using shared helper
 				const sessionData = await ensureBunqSession.call(
 					this,
-					credentials.apiKey as string,
-					credentials.privateKey as string,
-					credentials.publicKey as string,
-					environment,
+					{
+						apiKey: credentials.apiKey as string,
+						privateKey: credentials.privateKey as string,
+						publicKey: credentials.publicKey as string,
+						environment,
+					},
 					'n8n-bunq-webhook',
 					false,
 				);
 
 				if (!sessionData.sessionToken || !sessionData.userId) {
+					this.logger.error('Failed to establish session with Bunq API');
 					throw new NodeApiError(this.getNode(), { error: 'Session creation failed' }, {
 						message: 'Failed to create Bunq session',
 						description: 'Could not establish a session with the Bunq API',
 					});
 				}
 
-				// Build notification filters array
-				const notificationFilters = categories.map((category) => ({
+				this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
+
+				// Build notification filter for single category
+				const notificationFilters = [{
 					category,
 					notification_target: webhookUrl,
-				}));
+				}];
 
 				const payload = JSON.stringify({
 					notification_filters: notificationFilters,
@@ -252,6 +273,8 @@ export class BunqTrigger implements INodeType {
 				const signature = signData(payload, credentials.privateKey as string);
 
 				try {
+					this.logger.debug(`Registering webhook with Bunq API...`);
+					
 					// Register the webhook with Bunq
 					await this.helpers.httpRequest({
 						method: 'POST',
@@ -268,11 +291,14 @@ export class BunqTrigger implements INodeType {
 						body: payload,
 					});
 
+					this.logger.info(`Successfully registered webhook for category ${category}`);
 					return true;
 				} catch (error) {
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					this.logger.error(`Failed to register webhook: ${message}`);
 					throw new NodeApiError(
 						this.getNode(),
-						{ error: error instanceof Error ? error.message : 'Unknown error' },
+						{ error: message },
 						{
 							message: 'Failed to register webhook with Bunq',
 							description: 'Could not create notification filter in Bunq API',
@@ -284,27 +310,36 @@ export class BunqTrigger implements INodeType {
 			async delete(this: IHookFunctions): Promise<boolean> {
 				const webhookUrl = this.getNodeWebhookUrl('default');
 
+				this.logger.info(`Deleting webhook at ${webhookUrl}`);
+
 				try {
 					// Get credentials
 					const credentials = await this.getCredentials('bunqApi');
 					const environment = credentials.environment as string;
 					const baseUrl = getBunqBaseUrl(environment);
 
+					this.logger.debug(`Using ${environment} environment`);
+
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						credentials.apiKey as string,
-						credentials.privateKey as string,
-						credentials.publicKey as string,
-						environment,
+						{
+							apiKey: credentials.apiKey as string,
+							privateKey: credentials.privateKey as string,
+							publicKey: credentials.publicKey as string,
+							environment,
+						},
 						'n8n-bunq-webhook',
 						false,
 					);
 
 					if (!sessionData.sessionToken || !sessionData.userId) {
 						// If we can't get a session, assume webhook is already deleted
+						this.logger.debug('No valid session, assuming webhook already deleted');
 						return true;
 					}
+
+					this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
 					// Get existing notification filters
 					const response = await this.helpers.httpRequest({
@@ -319,6 +354,8 @@ export class BunqTrigger implements INodeType {
 							'X-Bunq-Client-Authentication': sessionData.sessionToken,
 						},
 					});
+
+					this.logger.debug('Retrieved existing notification filters');
 
 					// Build a list of filters that are NOT for our webhook URL
 					const filtersToKeep: Array<{ category: string; notification_target: string }> = [];
@@ -338,6 +375,8 @@ export class BunqTrigger implements INodeType {
 							}
 						}
 					}
+
+					this.logger.debug(`Keeping ${filtersToKeep.length} filters, removing webhook ${webhookUrl}`);
 
 					// Update filters (removing ours)
 					const payload = JSON.stringify({
@@ -361,6 +400,7 @@ export class BunqTrigger implements INodeType {
 						body: payload,
 					});
 
+					this.logger.info('Successfully deleted webhook');
 					return true;
 				} catch (error) {
 					// If deletion fails, don't throw - webhook might already be gone

@@ -10,6 +10,7 @@ This is an n8n community node. It lets you use the Bunq API in your n8n workflow
 [Compatibility](#compatibility)  
 [Usage](#usage)  
 [Resources](#resources)  
+[Version history](#version-history)  
 
 ## Installation
 
@@ -101,8 +102,8 @@ Then copy the contents of `private.pem` and `public.pem` into the respective cre
 
 ## Compatibility
 
-- **Minimum n8n version**: 1.0.0
-- **Tested with**: n8n v1.0.0+
+- **Minimum n8n version**: 1.55.0
+- **Tested with**: n8n v1.55.0+
 - **Bunq API version**: v1
 
 ## Usage
