@@ -3,9 +3,13 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
-  NodeApiError,
 } from 'n8n-workflow';
-import * as crypto from 'crypto';
+import {
+  createInstallation,
+  registerDevice,
+  createSession,
+  isSessionExpired,
+} from '../../utils/bunqApiHelpers';
 
 interface IBunqSessionData {
   installationToken?: string;
@@ -33,28 +37,11 @@ export class BunqSession implements INodeType {
     outputs: ['main'],
     credentials: [
       {
-        name: 'bunqApiCredentialApi',
+        name: 'bunqApi',
         required: true,
       },
     ],
     properties: [
-      {
-        displayName: 'Environment',
-        name: 'environment',
-        type: 'options',
-        options: [
-          {
-            name: 'Sandbox',
-            value: 'sandbox',
-          },
-          {
-            name: 'Production',
-            value: 'production',
-          },
-        ],
-        default: 'sandbox',
-        description: 'The Bunq API environment to use',
-      },
       {
         displayName: 'Force Recreate Session',
         name: 'forceRecreate',
@@ -78,14 +65,14 @@ export class BunqSession implements INodeType {
 
     for (let i = 0; i < items.length; i++) {
       try {
-        const environment = this.getNodeParameter('environment', i) as string;
         const forceRecreate = this.getNodeParameter('forceRecreate', i) as boolean;
         const serviceName = this.getNodeParameter('serviceName', i) as string;
 
-        const credentials = await this.getCredentials('bunqApiCredentialApi');
+        const credentials = await this.getCredentials('bunqApi');
         const apiKey = credentials.apiKey as string;
         const privateKey = credentials.privateKey as string;
         const publicKey = credentials.publicKey as string;
+        const environment = credentials.environment as string;
 
         const baseUrl = environment === 'sandbox' 
           ? 'https://public-api.sandbox.bunq.com/v1'
@@ -173,178 +160,4 @@ export class BunqSession implements INodeType {
 
     return this.prepareOutputData(returnData);
   }
-}
-
-async function createInstallation(
-  this: IExecuteFunctions,
-  baseUrl: string,
-  publicKey: string,
-  serviceName: string
-): Promise<{ token: string; serverPublicKey: string }> {
-  const payload = JSON.stringify({ client_public_key: publicKey });
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'User-Agent': serviceName,
-    'X-Bunq-Language': 'en_US',
-    'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Geolocation': '0 0 0 0 000',
-    'Cache-Control': 'no-cache',
-  };
-
-  const response = await this.helpers.httpRequest({
-    method: 'POST',
-    url: `${baseUrl}/installation`,
-    headers,
-    body: payload,
-  });
-
-  // Extract token and server public key from response
-  const responseData = response.Response;
-  let token = '';
-  let serverPublicKey = '';
-
-  for (const item of responseData) {
-    if (item.Token) {
-      token = item.Token.token;
-    }
-    if (item.ServerPublicKey) {
-      serverPublicKey = item.ServerPublicKey.server_public_key;
-    }
-  }
-
-  if (!token || !serverPublicKey) {
-    throw new NodeApiError(this.getNode(), {
-      message: 'Failed to extract installation token or server public key from response',
-      description: 'The installation response did not contain the expected data',
-    });
-  }
-
-  return { token, serverPublicKey };
-}
-
-async function registerDevice(
-  this: IExecuteFunctions,
-  baseUrl: string,
-  installationToken: string,
-  apiKey: string,
-  serviceName: string,
-  privateKey: string
-): Promise<string> {
-  const payload = JSON.stringify({
-    description: serviceName,
-    secret: apiKey,
-    permitted_ips: ['*']
-  });
-
-  const signature = signData(payload, privateKey);
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    'User-Agent': serviceName,
-    'X-Bunq-Language': 'en_US',
-    'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Geolocation': '0 0 0 0 000',
-    'X-Bunq-Client-Authentication': installationToken,
-    'X-Bunq-Client-Signature': signature,
-  };
-
-  const response = await this.helpers.httpRequest({
-    method: 'POST',
-    url: `${baseUrl}/device-server`,
-    headers,
-    body: payload,
-  });
-
-  // Extract device ID from response
-  const responseData = response.Response;
-  let deviceId = '';
-
-  for (const item of responseData) {
-    if (item.Id) {
-      deviceId = item.Id.id.toString();
-    }
-  }
-
-  if (!deviceId) {
-    throw new NodeApiError(this.getNode(), {
-      message: 'Failed to extract device ID from response',
-      description: 'The device registration response did not contain the expected data',
-    });
-  }
-
-  return deviceId;
-}
-
-async function createSession(
-  this: IExecuteFunctions,
-  baseUrl: string,
-  installationToken: string,
-  apiKey: string,
-  serviceName: string,
-  privateKey: string
-): Promise<{ token: string; userId: string }> {
-  const payload = JSON.stringify({ secret: apiKey });
-
-  const signature = signData(payload, privateKey);
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    'User-Agent': serviceName,
-    'X-Bunq-Language': 'en_US',
-    'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Geolocation': '0 0 0 0 000',
-    'X-Bunq-Client-Authentication': installationToken,
-    'X-Bunq-Client-Signature': signature,
-  };
-
-  const response = await this.helpers.httpRequest({
-    method: 'POST',
-    url: `${baseUrl}/session-server`,
-    headers,
-    body: payload,
-  });
-
-  // Extract token and user ID from response
-  const responseData = response.Response;
-  let token = '';
-  let userId = '';
-
-  for (const item of responseData) {
-    if (item.Token) {
-      token = item.Token.token;
-    }
-    if (item.UserPerson) {
-      userId = item.UserPerson.id.toString();
-    } else if (item.UserCompany) {
-      userId = item.UserCompany.id.toString();
-    } else if (item.UserApiKey) {
-      userId = item.UserApiKey.id.toString();
-    }
-  }
-
-  if (!token) {
-    throw new NodeApiError(this.getNode(), {
-      message: 'Failed to extract session token from response',
-      description: 'The session response did not contain the expected data',
-    });
-  }
-
-  return { token, userId };
-}
-
-function signData(data: string, privateKey: string): string {
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(data);
-  signer.end();
-  return signer.sign(privateKey, 'base64');
-}
-
-function isSessionExpired(createdAt: number): boolean {
-  // Bunq sessions typically expire after 90 days, but can be extended
-  // We'll check if the session is older than 89 days (to be safe)
-  const maxAge = 89 * 24 * 60 * 60 * 1000; // 89 days in milliseconds
-  return (Date.now() - createdAt) > maxAge;
 }

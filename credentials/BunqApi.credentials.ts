@@ -5,9 +5,9 @@ import {
   ICredentialTestRequest,
 } from 'n8n-workflow';
 
-export class BunqApiCredentialApi implements ICredentialType {
-  name = 'bunqApiCredentialApi';
-  displayName = 'Bunq API Credential API';
+export class BunqApi implements ICredentialType {
+  name = 'bunqApi';
+  displayName = 'Bunq API';
   documentationUrl = 'https://doc.bunq.com';
   icon: Icon = 'file:../assets/Bunq-logo.svg';
   test: ICredentialTestRequest = {
@@ -18,6 +18,23 @@ export class BunqApiCredentialApi implements ICredentialType {
     },
   };
   properties: INodeProperties[] = [
+    {
+      displayName: 'Environment',
+      name: 'environment',
+      type: 'options',
+      options: [
+        {
+          name: 'Sandbox',
+          value: 'sandbox',
+        },
+        {
+          name: 'Production',
+          value: 'production',
+        },
+      ],
+      default: 'sandbox',
+      description: 'The Bunq API environment to use',
+    },
     {
       displayName: 'API Key',
       name: 'apiKey',
