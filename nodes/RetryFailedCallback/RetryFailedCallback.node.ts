@@ -3,6 +3,7 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
+  NodeApiError,
 } from 'n8n-workflow';
 import {
   ensureBunqSession,
@@ -12,7 +13,7 @@ import {
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class RetryFailedCallback implements INodeType {
-  usableAsTool: boolean = true;
+  readonly usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Retry Failed Callback',
     name: 'retryFailedCallback',
@@ -73,9 +74,27 @@ export class RetryFailedCallback implements INodeType {
       for (let i = 0; i < items.length; i++) {
         const notificationIds = this.getNodeParameter('notificationIds', i) as string;
 
+        // Validate the format of notification IDs (should be comma-separated integers)
+        const trimmedIds = notificationIds.trim();
+        if (!trimmedIds) {
+          throw new NodeApiError(this.getNode(), {
+            message: 'Notification IDs cannot be empty',
+            description: 'Please provide at least one notification ID to retry',
+          });
+        }
+        
+        // Check if the format is valid (comma-separated numbers)
+        const idPattern = /^\d+(,\s*\d+)*$/;
+        if (!idPattern.test(trimmedIds)) {
+          throw new NodeApiError(this.getNode(), {
+            message: 'Invalid notification IDs format',
+            description: 'Notification IDs must be comma-separated integers (e.g., "1,2,3" or "1, 2, 3")',
+          });
+        }
+
         // Prepare request body
         const payload = JSON.stringify({
-          notification_filter_failed_ids: notificationIds,
+          notification_filter_failed_ids: trimmedIds,
         });
 
         // Sign the request
@@ -100,7 +119,7 @@ export class RetryFailedCallback implements INodeType {
         returnData.push({
           json: {
             success: true,
-            notificationIds,
+            notificationIds: trimmedIds,
             response: response.Response || response,
             environment,
           },

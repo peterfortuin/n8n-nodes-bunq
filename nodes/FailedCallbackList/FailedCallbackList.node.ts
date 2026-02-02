@@ -11,7 +11,7 @@ import {
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class FailedCallbackList implements INodeType {
-  usableAsTool: boolean = true;
+  readonly usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Failed Callback List',
     name: 'failedCallbackList',
