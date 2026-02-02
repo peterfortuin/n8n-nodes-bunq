@@ -12,8 +12,8 @@ export class BunqApi implements ICredentialType {
   icon: Icon = 'file:../assets/Bunq-logo.svg';
   test: ICredentialTestRequest = {
     request: {
-      baseURL: '={{$credentials.environment === "sandbox" ? "https://public-api.sandbox.bunq.com" : "https://api.bunq.com"}}',
-      url: '/v1/installation',
+      baseURL: '={{$credentials.environment === "sandbox" ? "https://public-api.sandbox.bunq.com/v1" : "https://api.bunq.com/v1"}}',
+      url: '/installation',
       method: 'GET',
     },
   };

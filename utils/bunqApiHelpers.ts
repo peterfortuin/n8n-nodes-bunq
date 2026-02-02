@@ -3,11 +3,18 @@ import * as crypto from 'crypto';
 
 /**
  * Get the Bunq API base URL based on environment
+ * @param environment - The environment ('sandbox' or 'production')
+ * @returns The base URL for the specified environment
+ * @throws Error if environment is invalid
  */
 export function getBunqBaseUrl(environment: string): string {
-  return environment === 'sandbox'
-    ? 'https://public-api.sandbox.bunq.com/v1'
-    : 'https://api.bunq.com/v1';
+  if (environment === 'sandbox') {
+    return 'https://public-api.sandbox.bunq.com/v1';
+  } else if (environment === 'production') {
+    return 'https://api.bunq.com/v1';
+  } else {
+    throw new Error(`Invalid Bunq environment: ${environment}. Must be 'sandbox' or 'production'.`);
+  }
 }
 
 /**
