@@ -31,9 +31,10 @@
         "n8nNodesApiVersion": 1,
         "strict": true,
         "credentials": [
-            "dist/credentials/BunqDevicePrivateKeyApi.credentials.js"
+            "dist/credentials/BunqApiCredentialApi.credentials.js"
         ],
         "nodes": [
+            "dist/nodes/BunqSession/BunqSession.node.js",
             "dist/nodes/SignRequest/SignRequest.node.js"
         ]
     },
