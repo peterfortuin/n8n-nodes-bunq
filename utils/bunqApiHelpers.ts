@@ -2,6 +2,15 @@ import { IExecuteFunctions, NodeApiError } from 'n8n-workflow';
 import * as crypto from 'crypto';
 
 /**
+ * Get the Bunq API base URL based on environment
+ */
+export function getBunqBaseUrl(environment: string): string {
+  return environment === 'sandbox'
+    ? 'https://public-api.sandbox.bunq.com/v1'
+    : 'https://api.bunq.com/v1';
+}
+
+/**
  * Sign data using RSA-SHA256
  */
 export function signData(data: string, privateKey: string): string {

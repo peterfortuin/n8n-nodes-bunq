@@ -9,6 +9,7 @@ import {
   registerDevice,
   createSession,
   isSessionExpired,
+  getBunqBaseUrl,
 } from '../../utils/bunqApiHelpers';
 
 interface IBunqSessionData {
@@ -74,9 +75,7 @@ export class BunqSession implements INodeType {
         const publicKey = credentials.publicKey as string;
         const environment = credentials.environment as string;
 
-        const baseUrl = environment === 'sandbox' 
-          ? 'https://public-api.sandbox.bunq.com/v1'
-          : 'https://api.bunq.com/v1';
+        const baseUrl = getBunqBaseUrl(environment);
 
         // Get or initialize session data from workflow static data
         const workflowStaticData = this.getWorkflowStaticData('node');
