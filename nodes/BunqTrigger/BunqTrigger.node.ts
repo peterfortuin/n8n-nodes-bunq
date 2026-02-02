@@ -221,7 +221,8 @@ export class BunqTrigger implements INodeType {
 				} catch (error) {
 					// If we can't check, assume it doesn't exist
 					// This can happen if the session is invalid or the API is unreachable
-					this.logger.error(`Failed to check webhook existence: ${getErrorMessage(error)}`);
+					// We treat this as a non-critical error and assume webhook needs to be created
+					this.logger.debug(`Failed to check webhook existence: ${getErrorMessage(error)}`);
 					return false;
 				}
 
@@ -338,8 +339,10 @@ export class BunqTrigger implements INodeType {
 					);
 
 					if (!sessionData.sessionToken || !sessionData.userId) {
-						// If we can't get a session, assume webhook is already deleted
-						this.logger.debug('No valid session, assuming webhook already deleted');
+						// If we can't get a session during deletion, it likely means the API key
+						// or credentials are no longer valid. Since the webhook can't be accessed
+						// anyway, we consider this a successful deletion scenario.
+						this.logger.info('No valid session available - webhook cannot be accessed (treating as deleted)');
 						return true;
 					}
 
