@@ -471,11 +471,10 @@ export class BunqTrigger implements INodeType {
 
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
 		const req = this.getRequestObject();
-		const body = req.body;
 
 		// Return the webhook payload to the workflow
 		return {
-			workflowData: [this.helpers.returnJsonArray([body])],
+			workflowData: [this.helpers.returnJsonArray([req.body])],
 		};
 	}
 }
