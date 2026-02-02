@@ -237,10 +237,7 @@ export async function ensureBunqSession(
   serviceName: string,
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
-  const apiKey = credentials.apiKey;
-  const privateKey = credentials.privateKey;
-  const publicKey = credentials.publicKey;
-  const environment = credentials.environment;
+  const { apiKey, privateKey, publicKey, environment } = credentials;
   const baseUrl = getBunqBaseUrl(environment);
 
   // Get or initialize session data from workflow static data

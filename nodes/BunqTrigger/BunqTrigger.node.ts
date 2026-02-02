@@ -12,6 +12,12 @@ import {
 	ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 
+/**
+ * Extract error message from unknown error type
+ */
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : 'Unknown error';
+}
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class BunqTrigger implements INodeType {
@@ -215,8 +221,7 @@ export class BunqTrigger implements INodeType {
 				} catch (error) {
 					// If we can't check, assume it doesn't exist
 					// This can happen if the session is invalid or the API is unreachable
-					const message = error instanceof Error ? error.message : 'Unknown error';
-					this.logger.error(`Failed to check webhook existence: ${message}`);
+					this.logger.error(`Failed to check webhook existence: ${getErrorMessage(error)}`);
 					return false;
 				}
 
@@ -274,7 +279,6 @@ export class BunqTrigger implements INodeType {
 
 				try {
 					this.logger.debug(`Registering webhook with Bunq API...`);
-					
 					// Register the webhook with Bunq
 					await this.helpers.httpRequest({
 						method: 'POST',
@@ -294,7 +298,7 @@ export class BunqTrigger implements INodeType {
 					this.logger.info(`Successfully registered webhook for category ${category}`);
 					return true;
 				} catch (error) {
-					const message = error instanceof Error ? error.message : 'Unknown error';
+					const message = getErrorMessage(error);
 					this.logger.error(`Failed to register webhook: ${message}`);
 					throw new NodeApiError(
 						this.getNode(),
@@ -405,8 +409,7 @@ export class BunqTrigger implements INodeType {
 				} catch (error) {
 					// If deletion fails, don't throw - webhook might already be gone
 					// Log for debugging but consider deletion successful
-					const message = error instanceof Error ? error.message : 'Unknown error';
-					this.logger.debug(`Failed to delete webhook (may already be deleted): ${message}`);
+					this.logger.debug(`Failed to delete webhook (may already be deleted): ${getErrorMessage(error)}`);
 					return true;
 				}
 			},
