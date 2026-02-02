@@ -4,7 +4,7 @@ import {
   INodeTypeDescription,
   INodeExecutionData
 } from 'n8n-workflow';
-import * as crypto from 'crypto';
+import { signData } from '../../utils/bunqApiHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class SignRequest implements INodeType {
@@ -23,7 +23,7 @@ export class SignRequest implements INodeType {
     outputs: ['main'],
     credentials: [
       {
-        name: 'bunqDevicePrivateKeyApi',
+        name: 'bunqApi',
         required: true,
       },
     ],
@@ -46,19 +46,15 @@ export class SignRequest implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    // Load private key from bunqDevicePrivateKeyApi credential
-    const credentials = await this.getCredentials('bunqDevicePrivateKeyApi');
+    // Load private key from bunqApi credential
+    const credentials = await this.getCredentials('bunqApi');
     const privateKey = credentials.privateKey as string;
 
     for (let i = 0; i < items.length; i++) {
       const body = this.getNodeParameter('body', i) as string;
 
-      // Sign with RSA-SHA256
-      const signer = crypto.createSign('RSA-SHA256');
-      signer.update(body);
-      signer.end();
-
-      const signature = signer.sign(privateKey, 'base64');
+      // Sign with RSA-SHA256 using shared helper
+      const signature = signData(body, privateKey);
 
       returnData.push({
         json: {
