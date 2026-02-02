@@ -134,6 +134,7 @@ export class BunqSession implements INodeType {
             baseUrl,
             sessionData.installationToken!,
             apiKey,
+            serviceName,
             privateKey
           );
           sessionData.sessionToken = sessionResult.token;
@@ -281,16 +282,17 @@ async function createSession(
   baseUrl: string,
   installationToken: string,
   apiKey: string,
+  serviceName: string,
   privateKey: string
 ): Promise<{ token: string; userId: string }> {
-  const payload = JSON.stringify({ secret: apiKey }, null, 0);
+  const payload = JSON.stringify({ secret: apiKey });
 
   const signature = signData(payload, privateKey);
 
   const headers = {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
-    'User-Agent': 'n8n-bunq-integration',
+    'User-Agent': serviceName,
     'X-Bunq-Language': 'en_US',
     'X-Bunq-Region': 'nl_NL',
     'X-Bunq-Geolocation': '0 0 0 0 000',
