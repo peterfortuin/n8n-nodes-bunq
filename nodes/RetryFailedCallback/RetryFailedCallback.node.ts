@@ -38,7 +38,7 @@ export class RetryFailedCallback implements INodeType {
         type: 'string',
         default: '',
         required: true,
-        description: 'Comma-separated list of failed notification IDs to retry',
+        description: 'Comma-separated list of failed notification IDs to retry (e.g., "1,2,3")',
         placeholder: '1,2,3',
       },
       {

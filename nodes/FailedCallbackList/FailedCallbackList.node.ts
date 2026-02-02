@@ -75,14 +75,14 @@ export class FailedCallbackList implements INodeType {
       // Extract the failed notifications from the response
       const failedNotifications = response.Response || [];
 
-      // Return the failed notifications for all items
-      const returnData: INodeExecutionData[] = items.map(() => ({
+      // Return a single result with all failed notifications
+      const returnData: INodeExecutionData[] = [{
         json: {
           failedNotifications,
           count: failedNotifications.length,
           environment,
         }
-      }));
+      }];
 
       return this.prepareOutputData(returnData);
 
