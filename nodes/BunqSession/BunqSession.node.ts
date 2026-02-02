@@ -50,40 +50,57 @@ export class BunqSession implements INodeType {
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
     const items = this.getInputData();
 
-    // Session creation logic (runs once, not per item)
-    const forceRecreate = this.getNodeParameter('forceRecreate', 0) as boolean;
-    const serviceName = this.getNodeParameter('serviceName', 0) as string;
+    try {
+      // Session creation logic (runs once, not per item)
+      const forceRecreate = this.getNodeParameter('forceRecreate', 0) as boolean;
+      const serviceName = this.getNodeParameter('serviceName', 0) as string;
 
-    const credentials = await this.getCredentials('bunqApi');
-    const apiKey = credentials.apiKey as string;
-    const privateKey = credentials.privateKey as string;
-    const publicKey = credentials.publicKey as string;
-    const environment = credentials.environment as string;
+      const credentials = await this.getCredentials('bunqApi');
+      const apiKey = credentials.apiKey as string;
+      const privateKey = credentials.privateKey as string;
+      const publicKey = credentials.publicKey as string;
+      const environment = credentials.environment as string;
 
-    // Use the shared session management function
-    const sessionData = await ensureBunqSession.call(
-      this,
-      apiKey,
-      privateKey,
-      publicKey,
-      environment,
-      serviceName,
-      forceRecreate
-    );
-
-    // Return the session data for all items
-    const returnData: INodeExecutionData[] = items.map(() => ({
-      json: {
-        sessionToken: sessionData.sessionToken,
-        installationToken: sessionData.installationToken,
-        deviceServerId: sessionData.deviceServerId,
-        userId: sessionData.userId,
-        sessionCreatedAt: sessionData.sessionCreatedAt,
-        sessionAge: sessionData.sessionCreatedAt ? Date.now() - sessionData.sessionCreatedAt : 0,
+      // Use the shared session management function
+      const sessionData = await ensureBunqSession.call(
+        this,
+        apiKey,
+        privateKey,
+        publicKey,
         environment,
-      }
-    }));
+        serviceName,
+        forceRecreate
+      );
 
-    return this.prepareOutputData(returnData);
+      // Return the session data for all items
+      const returnData: INodeExecutionData[] = items.map(() => ({
+        json: {
+          sessionToken: sessionData.sessionToken,
+          installationToken: sessionData.installationToken,
+          deviceServerId: sessionData.deviceServerId,
+          userId: sessionData.userId,
+          sessionCreatedAt: sessionData.sessionCreatedAt,
+          sessionAge: sessionData.sessionCreatedAt ? Date.now() - sessionData.sessionCreatedAt : 0,
+          environment,
+        }
+      }));
+
+      return this.prepareOutputData(returnData);
+
+    } catch (error) {
+      if (this.continueOnFail()) {
+        // Return error data for all items if continueOnFail is enabled
+        const returnData: INodeExecutionData[] = items.map((_, i) => ({
+          json: {
+            error: error.message,
+          },
+          pairedItem: {
+            item: i,
+          },
+        }));
+        return this.prepareOutputData(returnData);
+      }
+      throw error;
+    }
   }
 }
