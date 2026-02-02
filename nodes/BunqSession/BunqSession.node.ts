@@ -56,18 +56,12 @@ export class BunqSession implements INodeType {
       const serviceName = this.getNodeParameter('serviceName', 0) as string;
 
       const credentials = await this.getCredentials('bunqApi');
-      const apiKey = credentials.apiKey as string;
-      const privateKey = credentials.privateKey as string;
-      const publicKey = credentials.publicKey as string;
       const environment = credentials.environment as string;
 
       // Use the shared session management function
       const sessionData = await ensureBunqSession.call(
         this,
-        apiKey,
-        privateKey,
-        publicKey,
-        environment,
+        credentials,
         serviceName,
         forceRecreate
       );
