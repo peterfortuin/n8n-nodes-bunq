@@ -1,5 +1,10 @@
-import { IExecuteFunctions, NodeApiError } from 'n8n-workflow';
+import { IExecuteFunctions, IHookFunctions, NodeApiError } from 'n8n-workflow';
 import * as crypto from 'crypto';
+
+/**
+ * Type for Bunq API context - supports both execution and hook contexts
+ */
+type BunqApiContext = IExecuteFunctions | IHookFunctions;
 
 /**
  * Get the Bunq API base URL based on environment
@@ -31,7 +36,7 @@ export function signData(data: string, privateKey: string): string {
  * Create installation with Bunq API
  */
 export async function createInstallation(
-  this: IExecuteFunctions,
+  this: BunqApiContext,
   baseUrl: string,
   publicKey: string,
   serviceName: string
@@ -85,7 +90,7 @@ export async function createInstallation(
  * mobile networks, VPN), you'll need to re-register the device.
  */
 export async function registerDevice(
-  this: IExecuteFunctions,
+  this: BunqApiContext,
   baseUrl: string,
   installationToken: string,
   apiKey: string,
@@ -137,7 +142,7 @@ export async function registerDevice(
  * Create session with Bunq API
  */
 export async function createSession(
-  this: IExecuteFunctions,
+  this: BunqApiContext,
   baseUrl: string,
   installationToken: string,
   apiKey: string,
@@ -220,7 +225,7 @@ export interface IBunqSessionData {
  * This function manages the complete session lifecycle: installation, device registration, and session creation.
  * Each step is only performed if required (e.g., installation only if no token exists).
  * 
- * @param executeFunctions - The n8n execution context
+ * @param executeFunctions - The n8n execution context (IExecuteFunctions or IHookFunctions)
  * @param apiKey - The Bunq API key
  * @param privateKey - RSA private key in PEM format
  * @param publicKey - RSA public key in PEM format
@@ -230,7 +235,7 @@ export interface IBunqSessionData {
  * @returns Session data with all tokens and IDs
  */
 export async function ensureBunqSession(
-  this: IExecuteFunctions,
+  this: BunqApiContext,
   apiKey: string,
   privateKey: string,
   publicKey: string,

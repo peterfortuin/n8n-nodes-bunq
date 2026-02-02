@@ -9,7 +9,7 @@ import {
 import {
 	getBunqBaseUrl,
 	signData,
-	IBunqSessionData,
+	ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 
 
@@ -141,123 +141,6 @@ export class BunqTrigger implements INodeType {
 		],
 	};
 
-	// Helper method to ensure Bunq session for webhook operations
-	async ensureBunqSession(
-		context: IHookFunctions,
-		credentials: Record<string, unknown>,
-	): Promise<IBunqSessionData> {
-		const baseUrl = getBunqBaseUrl(credentials.environment as string);
-		const workflowStaticData = context.getWorkflowStaticData('node');
-		const sessionData: IBunqSessionData =
-			(workflowStaticData.bunqSession as IBunqSessionData) || {};
-
-		const apiKey = credentials.apiKey as string;
-		const privateKey = credentials.privateKey as string;
-		const publicKey = credentials.publicKey as string;
-
-		// Step 1: Create installation if needed
-		if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-			const payload = JSON.stringify({ client_public_key: publicKey });
-			const response = await context.helpers.httpRequest({
-				method: 'POST',
-				url: `${baseUrl}/installation`,
-				headers: {
-					'Content-Type': 'application/json',
-					'User-Agent': 'n8n-bunq-webhook',
-					'X-Bunq-Language': 'en_US',
-					'X-Bunq-Region': 'nl_NL',
-					'Cache-Control': 'no-cache',
-				},
-				body: payload,
-			});
-
-			const responseData = response.Response;
-			for (const item of responseData) {
-				if (item.Token) {
-					sessionData.installationToken = item.Token.token;
-				}
-				if (item.ServerPublicKey) {
-					sessionData.serverPublicKey = item.ServerPublicKey.server_public_key;
-				}
-			}
-			workflowStaticData.bunqSession = sessionData;
-		}
-
-		// Step 2: Register device if needed
-		if (!sessionData.deviceServerId) {
-			const payload = JSON.stringify({
-				description: 'n8n-bunq-webhook',
-				secret: apiKey,
-			});
-
-			const response = await context.helpers.httpRequest({
-				method: 'POST',
-				url: `${baseUrl}/device-server`,
-				headers: {
-					'Content-Type': 'application/json',
-					'Cache-Control': 'no-cache',
-					'User-Agent': 'n8n-bunq-webhook',
-					'X-Bunq-Language': 'en_US',
-					'X-Bunq-Region': 'nl_NL',
-					'X-Bunq-Client-Authentication': sessionData.installationToken!,
-				},
-				body: payload,
-			});
-
-			const responseData = response.Response;
-			for (const item of responseData) {
-				if (item.Id) {
-					sessionData.deviceServerId = item.Id.id.toString();
-				}
-			}
-			workflowStaticData.bunqSession = sessionData;
-		}
-
-		// Step 3: Create session if needed or if expired
-		const shouldCreateSession =
-			!sessionData.sessionToken ||
-			!sessionData.sessionCreatedAt ||
-			Date.now() - sessionData.sessionCreatedAt > 89 * 24 * 60 * 60 * 1000;
-
-		if (shouldCreateSession) {
-			const payload = JSON.stringify({ secret: apiKey });
-			const signature = signData(payload, privateKey);
-
-			const response = await context.helpers.httpRequest({
-				method: 'POST',
-				url: `${baseUrl}/session-server`,
-				headers: {
-					'Content-Type': 'application/json',
-					'Cache-Control': 'no-cache',
-					'User-Agent': 'n8n-bunq-webhook',
-					'X-Bunq-Language': 'en_US',
-					'X-Bunq-Region': 'nl_NL',
-					'X-Bunq-Client-Authentication': sessionData.installationToken!,
-					'X-Bunq-Client-Signature': signature,
-				},
-				body: payload,
-			});
-
-			const responseData = response.Response;
-			for (const item of responseData) {
-				if (item.Token) {
-					sessionData.sessionToken = item.Token.token;
-				}
-				if (item.UserPerson) {
-					sessionData.userId = item.UserPerson.id.toString();
-				} else if (item.UserCompany) {
-					sessionData.userId = item.UserCompany.id.toString();
-				} else if (item.UserApiKey) {
-					sessionData.userId = item.UserApiKey.id.toString();
-				}
-			}
-			sessionData.sessionCreatedAt = Date.now();
-			workflowStaticData.bunqSession = sessionData;
-		}
-
-		return sessionData;
-	}
-
 	webhookMethods = {
 		default: {
 			async checkExists(this: IHookFunctions): Promise<boolean> {
@@ -270,9 +153,16 @@ export class BunqTrigger implements INodeType {
 					const environment = credentials.environment as string;
 					const baseUrl = getBunqBaseUrl(environment);
 
-					// Get node instance to call helper method
-					const nodeInstance = new BunqTrigger();
-					const sessionData = await nodeInstance.ensureBunqSession(this, credentials);
+					// Ensure session exists using shared helper
+					const sessionData = await ensureBunqSession.call(
+						this,
+						credentials.apiKey as string,
+						credentials.privateKey as string,
+						credentials.publicKey as string,
+						environment,
+						'n8n-bunq-webhook',
+						false,
+					);
 
 					if (!sessionData.sessionToken || !sessionData.userId) {
 						return false;
@@ -330,9 +220,16 @@ export class BunqTrigger implements INodeType {
 				const environment = credentials.environment as string;
 				const baseUrl = getBunqBaseUrl(environment);
 
-				// Create session
-				const nodeInstance = new BunqTrigger();
-				const sessionData = await nodeInstance.ensureBunqSession(this, credentials);
+				// Ensure session exists using shared helper
+				const sessionData = await ensureBunqSession.call(
+					this,
+					credentials.apiKey as string,
+					credentials.privateKey as string,
+					credentials.publicKey as string,
+					environment,
+					'n8n-bunq-webhook',
+					false,
+				);
 
 				if (!sessionData.sessionToken || !sessionData.userId) {
 					throw new NodeApiError(this.getNode(), { error: 'Session creation failed' }, {
@@ -393,9 +290,16 @@ export class BunqTrigger implements INodeType {
 					const environment = credentials.environment as string;
 					const baseUrl = getBunqBaseUrl(environment);
 
-					// Create session
-					const nodeInstance = new BunqTrigger();
-					const sessionData = await nodeInstance.ensureBunqSession(this, credentials);
+					// Ensure session exists using shared helper
+					const sessionData = await ensureBunqSession.call(
+						this,
+						credentials.apiKey as string,
+						credentials.privateKey as string,
+						credentials.publicKey as string,
+						environment,
+						'n8n-bunq-webhook',
+						false,
+					);
 
 					if (!sessionData.sessionToken || !sessionData.userId) {
 						// If we can't get a session, assume webhook is already deleted
