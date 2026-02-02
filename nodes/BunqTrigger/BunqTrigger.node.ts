@@ -1,0 +1,475 @@
+import {
+	IHookFunctions,
+	IWebhookFunctions,
+	IWebhookResponseData,
+	INodeType,
+	INodeTypeDescription,
+	NodeApiError,
+} from 'n8n-workflow';
+import {
+	getBunqBaseUrl,
+	signData,
+	IBunqSessionData,
+} from '../../utils/bunqApiHelpers';
+
+
+export class BunqTrigger implements INodeType {
+	usableAsTool: boolean = false;
+	description: INodeTypeDescription = {
+		displayName: 'Bunq Trigger',
+		name: 'bunqTrigger',
+		icon: 'file:../../assets/Bunq-logo.svg',
+		group: ['trigger'],
+		version: 1,
+		description: 'Starts the workflow when Bunq sends a webhook notification',
+		defaults: {
+			name: 'Bunq Trigger',
+		},
+		inputs: [],
+		outputs: ['main'],
+		credentials: [
+			{
+				name: 'bunqApi',
+				required: true,
+			},
+		],
+		webhooks: [
+			{
+				name: 'default',
+				httpMethod: 'POST',
+				responseMode: 'onReceived',
+				path: 'webhook',
+			},
+		],
+		properties: [
+			{
+				displayName: 'Callback Categories',
+				name: 'categories',
+				type: 'multiOptions',
+				options: [
+					{
+						name: 'Billing',
+						value: 'BILLING',
+						description: 'Notifications for all bunq invoices',
+					},
+					{
+						name: 'bunq.me Tab',
+						value: 'BUNQME_TAB',
+						description: 'Notifications for updates on bunq.me Tab payments',
+					},
+					{
+						name: 'Card Transaction Failed',
+						value: 'CARD_TRANSACTION_FAILED',
+						description: 'Notifications for failed card transactions',
+					},
+					{
+						name: 'Card Transaction Successful',
+						value: 'CARD_TRANSACTION_SUCCESSFUL',
+						description: 'Notifications for successful card transactions',
+					},
+					{
+						name: 'Chat',
+						value: 'CHAT',
+						description: 'Notifications for received chat messages',
+					},
+					{
+						name: 'Draft Payment',
+						value: 'DRAFT_PAYMENT',
+						description: 'Notifications for creation and updates of draft payments',
+					},
+					{
+						name: 'iDEAL',
+						value: 'IDEAL',
+						description: 'Notifications for iDEAL deposits towards a bunq account',
+					},
+					{
+						name: 'Mutation',
+						value: 'MUTATION',
+						description: 'Notifications for any action that affects a monetary account\'s balance',
+					},
+					{
+						name: 'OAuth',
+						value: 'OAUTH',
+						description: 'Notifications for revoked OAuth connections',
+					},
+					{
+						name: 'Payment',
+						value: 'PAYMENT',
+						description: 'Notifications for payments created from or received on a bunq account',
+					},
+					{
+						name: 'Request',
+						value: 'REQUEST',
+						description: 'Notifications for incoming requests and updates on outgoing requests',
+					},
+					{
+						name: 'Schedule Result',
+						value: 'SCHEDULE_RESULT',
+						description: 'Notifications for when a scheduled payment is executed',
+					},
+					{
+						name: 'Schedule Status',
+						value: 'SCHEDULE_STATUS',
+						description: 'Notifications about the status of a scheduled payment',
+					},
+					{
+						name: 'Share',
+						value: 'SHARE',
+						description: 'Notifications for any updates or creation of Connects',
+					},
+					{
+						name: 'SOFORT',
+						value: 'SOFORT',
+						description: 'Notifications for SOFORT deposits towards a bunq account',
+					},
+					{
+						name: 'Support',
+						value: 'SUPPORT',
+						description: 'Notifications for messages received through support chat',
+					},
+					{
+						name: 'Tab Result',
+						value: 'TAB_RESULT',
+						description: 'Notifications for updates on Tab payments',
+					},
+				],
+				default: ['MUTATION'],
+				required: true,
+				description: 'The types of events you want to receive webhook notifications for',
+			},
+		],
+		usableAsTool: true,
+	};
+
+	// Helper method to ensure Bunq session for webhook operations
+	async ensureBunqSession(
+		context: IHookFunctions,
+		credentials: Record<string, unknown>,
+	): Promise<IBunqSessionData> {
+		const baseUrl = getBunqBaseUrl(credentials.environment as string);
+		const workflowStaticData = context.getWorkflowStaticData('node');
+		const sessionData: IBunqSessionData =
+			(workflowStaticData.bunqSession as IBunqSessionData) || {};
+
+		const apiKey = credentials.apiKey as string;
+		const privateKey = credentials.privateKey as string;
+		const publicKey = credentials.publicKey as string;
+
+		// Step 1: Create installation if needed
+		if (!sessionData.installationToken || !sessionData.serverPublicKey) {
+			const payload = JSON.stringify({ client_public_key: publicKey });
+			const response = await context.helpers.httpRequest({
+				method: 'POST',
+				url: `${baseUrl}/installation`,
+				headers: {
+					'Content-Type': 'application/json',
+					'User-Agent': 'n8n-bunq-webhook',
+					'X-Bunq-Language': 'en_US',
+					'X-Bunq-Region': 'nl_NL',
+					'Cache-Control': 'no-cache',
+				},
+				body: payload,
+			});
+
+			const responseData = response.Response;
+			for (const item of responseData) {
+				if (item.Token) {
+					sessionData.installationToken = item.Token.token;
+				}
+				if (item.ServerPublicKey) {
+					sessionData.serverPublicKey = item.ServerPublicKey.server_public_key;
+				}
+			}
+			workflowStaticData.bunqSession = sessionData;
+		}
+
+		// Step 2: Register device if needed
+		if (!sessionData.deviceServerId) {
+			const payload = JSON.stringify({
+				description: 'n8n-bunq-webhook',
+				secret: apiKey,
+			});
+
+			const response = await context.helpers.httpRequest({
+				method: 'POST',
+				url: `${baseUrl}/device-server`,
+				headers: {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache',
+					'User-Agent': 'n8n-bunq-webhook',
+					'X-Bunq-Language': 'en_US',
+					'X-Bunq-Region': 'nl_NL',
+					'X-Bunq-Client-Authentication': sessionData.installationToken!,
+				},
+				body: payload,
+			});
+
+			const responseData = response.Response;
+			for (const item of responseData) {
+				if (item.Id) {
+					sessionData.deviceServerId = item.Id.id.toString();
+				}
+			}
+			workflowStaticData.bunqSession = sessionData;
+		}
+
+		// Step 3: Create session if needed or if expired
+		const shouldCreateSession =
+			!sessionData.sessionToken ||
+			!sessionData.sessionCreatedAt ||
+			Date.now() - sessionData.sessionCreatedAt > 89 * 24 * 60 * 60 * 1000;
+
+		if (shouldCreateSession) {
+			const payload = JSON.stringify({ secret: apiKey });
+			const signature = signData(payload, privateKey);
+
+			const response = await context.helpers.httpRequest({
+				method: 'POST',
+				url: `${baseUrl}/session-server`,
+				headers: {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache',
+					'User-Agent': 'n8n-bunq-webhook',
+					'X-Bunq-Language': 'en_US',
+					'X-Bunq-Region': 'nl_NL',
+					'X-Bunq-Client-Authentication': sessionData.installationToken!,
+					'X-Bunq-Client-Signature': signature,
+				},
+				body: payload,
+			});
+
+			const responseData = response.Response;
+			for (const item of responseData) {
+				if (item.Token) {
+					sessionData.sessionToken = item.Token.token;
+				}
+				if (item.UserPerson) {
+					sessionData.userId = item.UserPerson.id.toString();
+				} else if (item.UserCompany) {
+					sessionData.userId = item.UserCompany.id.toString();
+				} else if (item.UserApiKey) {
+					sessionData.userId = item.UserApiKey.id.toString();
+				}
+			}
+			sessionData.sessionCreatedAt = Date.now();
+			workflowStaticData.bunqSession = sessionData;
+		}
+
+		return sessionData;
+	}
+
+	webhookMethods = {
+		default: {
+			async checkExists(this: IHookFunctions): Promise<boolean> {
+				const webhookUrl = this.getNodeWebhookUrl('default');
+				const categories = this.getNodeParameter('categories') as string[];
+
+				try {
+					// Get credentials and session
+					const credentials = await this.getCredentials('bunqApi');
+					const environment = credentials.environment as string;
+					const baseUrl = getBunqBaseUrl(environment);
+
+					// Get node instance to call helper method
+					const nodeInstance = new BunqTrigger();
+					const sessionData = await nodeInstance.ensureBunqSession(this, credentials);
+
+					if (!sessionData.sessionToken || !sessionData.userId) {
+						return false;
+					}
+
+					// Get existing notification filters
+					const response = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						headers: {
+							'Content-Type': 'application/json',
+							'Cache-Control': 'no-cache',
+							'User-Agent': 'n8n-bunq-webhook',
+							'X-Bunq-Language': 'en_US',
+							'X-Bunq-Region': 'nl_NL',
+							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+						},
+					});
+
+					// Check if our webhook exists with the correct categories
+					if (response.Response && Array.isArray(response.Response)) {
+						for (const item of response.Response) {
+							if (item.NotificationFilterUrl) {
+								const filters = item.NotificationFilterUrl.notification_filters || [];
+								// Check if all our categories are registered with our webhook URL
+								const hasAllCategories = categories.every((cat) =>
+									filters.some(
+										(f: { category: string; notification_target: string }) =>
+											f.category === cat && f.notification_target === webhookUrl,
+									),
+								);
+								if (hasAllCategories) {
+									return true;
+								}
+							}
+						}
+					}
+				} catch {
+					// If we can't check, assume it doesn't exist
+					return false;
+				}
+
+				return false;
+			},
+
+			async create(this: IHookFunctions): Promise<boolean> {
+				const webhookUrl = this.getNodeWebhookUrl('default');
+				const categories = this.getNodeParameter('categories') as string[];
+
+				// Get credentials
+				const credentials = await this.getCredentials('bunqApi');
+				const environment = credentials.environment as string;
+				const baseUrl = getBunqBaseUrl(environment);
+
+				// Create session
+				const nodeInstance = new BunqTrigger();
+				const sessionData = await nodeInstance.ensureBunqSession(this, credentials);
+
+				if (!sessionData.sessionToken || !sessionData.userId) {
+					throw new NodeApiError(this.getNode(), { error: 'Session creation failed' }, {
+						message: 'Failed to create Bunq session',
+						description: 'Could not establish a session with the Bunq API',
+					});
+				}
+
+				// Build notification filters array
+				const notificationFilters = categories.map((category) => ({
+					category,
+					notification_target: webhookUrl,
+				}));
+
+				const payload = JSON.stringify({
+					notification_filters: notificationFilters,
+				});
+
+				// Sign the payload
+				const signature = signData(payload, credentials.privateKey as string);
+
+				try {
+					// Register the webhook with Bunq
+					await this.helpers.httpRequest({
+						method: 'POST',
+						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						headers: {
+							'Content-Type': 'application/json',
+							'Cache-Control': 'no-cache',
+							'User-Agent': 'n8n-bunq-webhook',
+							'X-Bunq-Language': 'en_US',
+							'X-Bunq-Region': 'nl_NL',
+							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+							'X-Bunq-Client-Signature': signature,
+						},
+						body: payload,
+					});
+
+					return true;
+				} catch (error) {
+					throw new NodeApiError(
+						this.getNode(),
+						{ error: error instanceof Error ? error.message : 'Unknown error' },
+						{
+							message: 'Failed to register webhook with Bunq',
+							description: 'Could not create notification filter in Bunq API',
+						},
+					);
+				}
+			},
+
+			async delete(this: IHookFunctions): Promise<boolean> {
+				const webhookUrl = this.getNodeWebhookUrl('default');
+
+				try {
+					// Get credentials
+					const credentials = await this.getCredentials('bunqApi');
+					const environment = credentials.environment as string;
+					const baseUrl = getBunqBaseUrl(environment);
+
+					// Create session
+					const nodeInstance = new BunqTrigger();
+					const sessionData = await nodeInstance.ensureBunqSession(this, credentials);
+
+					if (!sessionData.sessionToken || !sessionData.userId) {
+						// If we can't get a session, assume webhook is already deleted
+						return true;
+					}
+
+					// Get existing notification filters
+					const response = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						headers: {
+							'Content-Type': 'application/json',
+							'Cache-Control': 'no-cache',
+							'User-Agent': 'n8n-bunq-webhook',
+							'X-Bunq-Language': 'en_US',
+							'X-Bunq-Region': 'nl_NL',
+							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+						},
+					});
+
+					// Build a list of filters that are NOT for our webhook URL
+					const filtersToKeep: Array<{ category: string; notification_target: string }> = [];
+					if (response.Response && Array.isArray(response.Response)) {
+						for (const item of response.Response) {
+							if (item.NotificationFilterUrl) {
+								const filters = item.NotificationFilterUrl.notification_filters || [];
+								for (const filter of filters) {
+									// Keep filters that are not for our webhook URL
+									if (filter.notification_target !== webhookUrl) {
+										filtersToKeep.push({
+											category: filter.category,
+											notification_target: filter.notification_target,
+										});
+									}
+								}
+							}
+						}
+					}
+
+					// Update filters (removing ours)
+					const payload = JSON.stringify({
+						notification_filters: filtersToKeep,
+					});
+
+					const signature = signData(payload, credentials.privateKey as string);
+
+					await this.helpers.httpRequest({
+						method: 'POST',
+						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						headers: {
+							'Content-Type': 'application/json',
+							'Cache-Control': 'no-cache',
+							'User-Agent': 'n8n-bunq-webhook',
+							'X-Bunq-Language': 'en_US',
+							'X-Bunq-Region': 'nl_NL',
+							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+							'X-Bunq-Client-Signature': signature,
+						},
+						body: payload,
+					});
+
+					return true;
+				} catch {
+					// If deletion fails, log but don't throw - webhook might already be gone
+					return true;
+				}
+			},
+		},
+	};
+
+	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+		const req = this.getRequestObject();
+		const body = req.body;
+
+		// Return the webhook payload to the workflow
+		return {
+			workflowData: [this.helpers.returnJsonArray([body])],
+		};
+	}
+}

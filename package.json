@@ -35,7 +35,8 @@
         ],
         "nodes": [
             "dist/nodes/BunqSession/BunqSession.node.js",
-            "dist/nodes/SignRequest/SignRequest.node.js"
+            "dist/nodes/SignRequest/SignRequest.node.js",
+            "dist/nodes/BunqTrigger/BunqTrigger.node.js"
         ]
     },
     "devDependencies": {
