@@ -37,8 +37,8 @@
             "dist/nodes/BunqSession/BunqSession.node.js",
             "dist/nodes/SignRequest/SignRequest.node.js",
             "dist/nodes/BunqTrigger/BunqTrigger.node.js",
-            "dist/nodes/FailedCallbackList/FailedCallbackList.node.js",
-            "dist/nodes/RetryFailedCallback/RetryFailedCallback.node.js"
+            "dist/nodes/BunqFailedCallbackList/BunqFailedCallbackList.node.js",
+            "dist/nodes/BunqRetryFailedCallback/BunqRetryFailedCallback.node.js"
         ]
     },
     "devDependencies": {
