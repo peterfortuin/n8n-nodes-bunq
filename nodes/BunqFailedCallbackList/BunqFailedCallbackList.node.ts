@@ -91,7 +91,7 @@ export class BunqFailedCallbackList implements INodeType {
         }
       }];
 
-      return this.prepareOutputData(returnData);
+      return [returnData];
 
     } catch (error) {
       // Enhance error message with response details if available
@@ -141,7 +141,7 @@ export class BunqFailedCallbackList implements INodeType {
             item: i,
           },
         }));
-        return this.prepareOutputData(returnData);
+        return [returnData];
       }
       throw error;
     }
