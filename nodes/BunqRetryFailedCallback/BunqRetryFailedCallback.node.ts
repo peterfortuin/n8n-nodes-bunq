@@ -16,7 +16,7 @@ export class BunqRetryFailedCallback implements INodeType {
   readonly usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Retry Failed Callback',
-    name: 'retryFailedCallback',
+    name: 'bunqRetryFailedCallback',
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,

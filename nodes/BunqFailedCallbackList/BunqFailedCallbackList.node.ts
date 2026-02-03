@@ -14,7 +14,7 @@ export class BunqFailedCallbackList implements INodeType {
   readonly usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Failed Callback List',
-    name: 'failedCallbackList',
+    name: 'bunqFailedCallbackList',
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
