@@ -132,11 +132,25 @@ export class BunqRetryFailedCallback implements INodeType {
       return this.prepareOutputData(returnData);
 
     } catch (error) {
+      // Enhance error message with response details if available
+      if (error.response) {
+        const errorDetails = {
+          statusCode: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url: error.config?.url,
+          method: error.config?.method,
+        };
+        error.message = `${error.message}\n\nAPI Response Details:\n${JSON.stringify(errorDetails, null, 2)}`;
+      }
+
       if (this.continueOnFail()) {
         const returnData: INodeExecutionData[] = items.map((_, i) => ({
           json: {
             error: error.message,
             success: false,
+            statusCode: error.response?.status,
+            responseData: error.response?.data,
           },
           pairedItem: {
             item: i,
