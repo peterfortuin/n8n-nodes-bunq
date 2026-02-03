@@ -10,7 +10,7 @@ import {
 } from '../../utils/bunqApiHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
-export class FailedCallbackList implements INodeType {
+export class BunqFailedCallbackList implements INodeType {
   readonly usableAsTool: boolean = true;
   description: INodeTypeDescription = {
     displayName: 'Bunq Failed Callback List',
