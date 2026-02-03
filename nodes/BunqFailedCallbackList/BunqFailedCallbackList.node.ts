@@ -127,7 +127,27 @@ export class BunqFailedCallbackList implements INodeType {
           data: error.response.data,
           method: error.config?.method,
         };
-        error.message = `${error.message}\n\nAPI Response Details:\n${JSON.stringify(errorDetails, null, 2)}`;
+        
+        // Safely stringify error details, handling circular references
+        let errorDetailsString: string;
+        try {
+          errorDetailsString = JSON.stringify(errorDetails, null, 2);
+        } catch {
+          // If circular reference error, create a safe version with just primitives
+          errorDetailsString = JSON.stringify({
+            environment,
+            requestId,
+            responseId,
+            callTime,
+            endpoint,
+            statusCode,
+            statusText: error.response.statusText,
+            data: typeof error.response.data === 'object' ? '[Complex Object]' : error.response.data,
+            method: error.config?.method,
+          }, null, 2);
+        }
+        
+        error.message = `${error.message}\n\nAPI Response Details:\n${errorDetailsString}`;
       }
 
       if (this.continueOnFail()) {
