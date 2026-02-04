@@ -54,6 +54,24 @@ A utility node to create and manage Bunq API sessions, including installation, d
 ### Sign Request
 A utility node that signs request bodies using RSA-SHA256 with your Bunq private key, useful for making authenticated API calls to Bunq.
 
+### Failed Callback List
+A node that retrieves a list of failed callbacks (webhook notifications) from the Bunq API. This node helps you monitor and troubleshoot webhook failures in your automations.
+
+**Features:**
+- Lists all failed webhook notification attempts
+- Shows failure details including error messages and response codes
+- Returns event types and categories for each failed notification
+- Useful for debugging webhook integration issues
+
+### Retry Failed Callback
+A node that requests a retry for previously failed callbacks via the Bunq API. This allows you to manually trigger the retry of failed webhook events.
+
+**Features:**
+- Retry specific failed notifications by their IDs
+- Can process multiple notification IDs in a single request
+- Provides confirmation of retry attempts
+- Helps recover from temporary webhook failures
+
 ## Credentials
 
 To use these nodes, you need to set up Bunq API credentials in n8n:
@@ -141,6 +159,43 @@ Most workflows won't need this node directly, as the Bunq Trigger handles sessio
 
 The Sign Request node signs request bodies using your Bunq private key. This is useful when making custom API calls to Bunq that require request signing.
 
+### Using Failed Callback List
+
+The Failed Callback List node retrieves failed webhook notifications from your Bunq account, helping you monitor and troubleshoot webhook delivery issues.
+
+1. Add the **Failed Callback List** node to your workflow
+2. Select or create your Bunq API credentials
+3. Execute the node to retrieve all failed notifications
+
+The node will return information about each failed notification including:
+- The notification filters that were attempted
+- The category and event type
+- The error message and response code
+- The object ID that triggered the notification
+
+**Example workflow:**
+```
+Schedule Trigger → Failed Callback List → IF (has failures) → Send Alert Email
+```
+
+This workflow can check for failed callbacks periodically and alert you when failures occur.
+
+### Using Retry Failed Callback
+
+The Retry Failed Callback node allows you to manually retry webhook notifications that previously failed to deliver.
+
+1. Add the **Retry Failed Callback** node to your workflow
+2. Select or create your Bunq API credentials
+3. Enter the comma-separated IDs of the notifications you want to retry
+4. Execute the node to trigger the retry
+
+**Example workflow:**
+```
+Failed Callback List → Extract IDs → Retry Failed Callback → Log Success
+```
+
+This workflow retrieves failed callbacks and automatically retries them.
+
 ## Resources
 
 * [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
@@ -148,6 +203,11 @@ The Sign Request node signs request bodies using your Bunq private key. This is 
 * [Bunq Callbacks (Webhooks) Documentation](https://doc.bunq.com/basics/callbacks-webhooks)
 
 ## Version history
+
+### 0.2.0
+- Added Failed Callback List node to retrieve failed webhook notifications
+- Added Retry Failed Callback node to retry failed webhook deliveries
+- Enhanced webhook monitoring and error recovery capabilities
 
 ### 0.1.0
 - Initial release

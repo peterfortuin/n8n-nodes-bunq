@@ -49,6 +49,7 @@ export async function createInstallation(
     'X-Bunq-Language': 'en_US',
     'X-Bunq-Region': 'nl_NL',
     'Cache-Control': 'no-cache',
+    'X-Bunq-Client-Request-Id': Date.now().toString(),
   };
 
   const response = await this.helpers.httpRequest({
@@ -109,6 +110,7 @@ export async function registerDevice(
     'X-Bunq-Language': 'en_US',
     'X-Bunq-Region': 'nl_NL',
     'X-Bunq-Client-Authentication': installationToken,
+    'X-Bunq-Client-Request-Id': Date.now().toString(),
   };
 
   const response = await this.helpers.httpRequest({
@@ -161,6 +163,7 @@ export async function createSession(
     'X-Bunq-Region': 'nl_NL',
     'X-Bunq-Client-Authentication': installationToken,
     'X-Bunq-Client-Signature': signature,
+    'X-Bunq-Client-Request-Id': Date.now().toString(),
   };
 
   const response = await this.helpers.httpRequest({
