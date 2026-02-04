@@ -59,10 +59,11 @@ export class BunqFailedCallbackList implements INodeType {
         false
       );
 
+      // Generate unique request ID using timestamp in milliseconds
+      const requestId = Date.now().toString();
       const endpoint = `/user/${sessionData.userId}/notification-filter-failure`;
 
       // Make API request to list failed callbacks
-      // Note: X-Bunq-Client-Request-Id is not included for GET requests (consistent with other nodes)
       const response = await this.helpers.httpRequest({
         method: 'GET',
         url: `${baseUrl}${endpoint}`,
@@ -73,6 +74,7 @@ export class BunqFailedCallbackList implements INodeType {
           'X-Bunq-Language': 'en_US',
           'X-Bunq-Region': 'nl_NL',
           'X-Bunq-Client-Authentication': sessionData.sessionToken!,
+          'X-Bunq-Client-Request-Id': requestId,
         },
         returnFullResponse: true,
       });
