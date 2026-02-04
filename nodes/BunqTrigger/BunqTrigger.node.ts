@@ -189,6 +189,7 @@ export class BunqTrigger implements INodeType {
 							'X-Bunq-Language': 'en_US',
 							'X-Bunq-Region': 'nl_NL',
 							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+							'X-Bunq-Client-Request-Id': Date.now().toString(),
 						},
 					});
 
@@ -281,6 +282,7 @@ export class BunqTrigger implements INodeType {
 							'X-Bunq-Language': 'en_US',
 							'X-Bunq-Region': 'nl_NL',
 							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+							'X-Bunq-Client-Request-Id': Date.now().toString(),
 							'X-Bunq-Client-Signature': signature,
 						},
 						body: payload,
@@ -344,6 +346,7 @@ export class BunqTrigger implements INodeType {
 							'X-Bunq-Language': 'en_US',
 							'X-Bunq-Region': 'nl_NL',
 							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+							'X-Bunq-Client-Request-Id': Date.now().toString(),
 						},
 					});
 
@@ -387,6 +390,7 @@ export class BunqTrigger implements INodeType {
 							'X-Bunq-Language': 'en_US',
 							'X-Bunq-Region': 'nl_NL',
 							'X-Bunq-Client-Authentication': sessionData.sessionToken,
+							'X-Bunq-Client-Request-Id': Date.now().toString(),
 							'X-Bunq-Client-Signature': signature,
 						},
 						body: payload,
