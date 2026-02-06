@@ -1,5 +1,7 @@
-import { IExecuteFunctions, IHookFunctions, ICredentialDataDecryptedObject, NodeApiError } from 'n8n-workflow';
+import { IExecuteFunctions, IHookFunctions, NodeApiError } from 'n8n-workflow';
 import * as crypto from 'crypto';
+import { BunqHttpClient } from './BunqHttpClient';
+import packageJson from '../package.json';
 
 /**
  * Type for Bunq API context - supports both execution and hook contexts
@@ -34,27 +36,21 @@ export function signData(data: string, privateKey: string): string {
 
 /**
  * Create installation with Bunq API
+ * @param baseUrl - The Bunq API base URL (production or sandbox)
+ * @param publicKey - The client's public key for installation
+ * @returns Installation token and server public key
  */
 export async function createInstallation(
   this: BunqApiContext,
   baseUrl: string,
-  publicKey: string,
-  serviceName: string
+  publicKey: string
 ): Promise<{ token: string; serverPublicKey: string }> {
   const payload = JSON.stringify({ client_public_key: publicKey });
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'User-Agent': serviceName,
-    'X-Bunq-Language': 'en_US',
-    'X-Bunq-Region': 'nl_NL',
-    'Cache-Control': 'no-cache',
-  };
-
-  const response = await this.helpers.httpRequest({
+  const client = new BunqHttpClient(this);
+  const response = await client.request({
     method: 'POST',
-    url: `${baseUrl}/installation`,
-    headers,
+    url: '/installation',
     body: payload,
   });
 
@@ -88,34 +84,32 @@ export async function createInstallation(
  * to the IP address of the caller. This provides better security but requires that
  * API calls come from the same IP address. If your IP changes (e.g., dynamic IPs,
  * mobile networks, VPN), you'll need to re-register the device.
+ * @param baseUrl - The Bunq API base URL (production or sandbox)
+ * @param installationToken - Token from installation step
+ * @param apiKey - The Bunq API key
+ * @returns Device ID
  */
 export async function registerDevice(
   this: BunqApiContext,
   baseUrl: string,
   installationToken: string,
-  apiKey: string,
-  serviceName: string
+  apiKey: string
 ): Promise<string> {
+  // Use package name and version for device description
+  const serviceName = `${packageJson.name}/${packageJson.version}`;
+  
   // By not including permitted_ips, Bunq automatically locks device to caller's IP
   const payload = JSON.stringify({
     description: serviceName,
     secret: apiKey,
   });
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    'User-Agent': serviceName,
-    'X-Bunq-Language': 'en_US',
-    'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Client-Authentication': installationToken,
-  };
-
-  const response = await this.helpers.httpRequest({
+  const client = new BunqHttpClient(this);
+  const response = await client.request({
     method: 'POST',
-    url: `${baseUrl}/device-server`,
-    headers,
+    url: '/device-server',
     body: payload,
+    sessionToken: installationToken,
   });
 
   // Extract device ID from response
@@ -140,34 +134,25 @@ export async function registerDevice(
 
 /**
  * Create session with Bunq API
+ * @param baseUrl - The Bunq API base URL (production or sandbox)
+ * @param installationToken - Token from installation step
+ * @param apiKey - The Bunq API key
+ * @returns Session token and user ID
  */
 export async function createSession(
   this: BunqApiContext,
   baseUrl: string,
   installationToken: string,
-  apiKey: string,
-  serviceName: string,
-  privateKey: string
+  apiKey: string
 ): Promise<{ token: string; userId: string }> {
   const payload = JSON.stringify({ secret: apiKey });
 
-  const signature = signData(payload, privateKey);
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    'User-Agent': serviceName,
-    'X-Bunq-Language': 'en_US',
-    'X-Bunq-Region': 'nl_NL',
-    'X-Bunq-Client-Authentication': installationToken,
-    'X-Bunq-Client-Signature': signature,
-  };
-
-  const response = await this.helpers.httpRequest({
+  const client = new BunqHttpClient(this);
+  const response = await client.request({
     method: 'POST',
-    url: `${baseUrl}/session-server`,
-    headers,
+    url: '/session-server',
     body: payload,
+    sessionToken: installationToken,
   });
 
   // Extract token and user ID from response
@@ -218,27 +203,24 @@ export interface IBunqSessionData {
   sessionToken?: string;
   sessionCreatedAt?: number;
   userId?: string;
+  environment?: string;
 }
 
 /**
- * Ensure Bunq session is created and valid
- * This function manages the complete session lifecycle: installation, device registration, and session creation.
- * Each step is only performed if required (e.g., installation only if no token exists).
- * 
- * @param executeFunctions - The n8n execution context (IExecuteFunctions or IHookFunctions)
- * @param credentials - The Bunq API credentials object from getCredentials('bunqApi')
- * @param serviceName - Name of the service/application
- * @param forceRecreate - Whether to force recreation of the session
+ * Ensures a valid Bunq session exists or creates one if needed.
+ * Manages the complete session lifecycle including installation, device registration, and session creation.
+ * @param this - The Bunq API context (IExecuteFunctions or IHookFunctions)
+ * @param forceRecreate - If true, forces recreation of all session data
  * @returns Session data with all tokens and IDs
  */
 export async function ensureBunqSession(
   this: BunqApiContext,
-  credentials: ICredentialDataDecryptedObject,
-  serviceName: string,
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
+  // Retrieve credentials from context
+  const credentials = await this.getCredentials('bunqApi');
+  
   const apiKey = credentials.apiKey as string;
-  const privateKey = credentials.privateKey as string;
   const publicKey = credentials.publicKey as string;
   const environment = credentials.environment as string;
   const baseUrl = getBunqBaseUrl(environment);
@@ -255,7 +237,7 @@ export async function ensureBunqSession(
 
   // Step 1: Create installation if needed
   if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-    const installationResult = await createInstallation.call(this, baseUrl, publicKey, serviceName);
+    const installationResult = await createInstallation.call(this, baseUrl, publicKey);
     sessionData.installationToken = installationResult.token;
     sessionData.serverPublicKey = installationResult.serverPublicKey;
     workflowStaticData.bunqSession = sessionData;
@@ -267,8 +249,7 @@ export async function ensureBunqSession(
       this,
       baseUrl,
       sessionData.installationToken!,
-      apiKey,
-      serviceName
+      apiKey
     );
     sessionData.deviceServerId = deviceId;
     workflowStaticData.bunqSession = sessionData;
@@ -284,9 +265,7 @@ export async function ensureBunqSession(
       this,
       baseUrl,
       sessionData.installationToken!,
-      apiKey,
-      serviceName,
-      privateKey
+      apiKey
     );
     sessionData.sessionToken = sessionResult.token;
     sessionData.sessionCreatedAt = Date.now();
@@ -294,5 +273,8 @@ export async function ensureBunqSession(
     workflowStaticData.bunqSession = sessionData;
   }
 
+  // Always include environment in returned session data
+  sessionData.environment = environment;
+  
   return sessionData;
 }

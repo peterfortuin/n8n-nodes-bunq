@@ -7,10 +7,9 @@ import {
 	NodeApiError,
 } from 'n8n-workflow';
 import {
-	getBunqBaseUrl,
-	signData,
 	ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
+import { BunqHttpClient } from '../../utils/BunqHttpClient';
 
 /**
  * Extract error message from unknown error type
@@ -156,18 +155,9 @@ export class BunqTrigger implements INodeType {
 				this.logger.debug(`Checking if webhook exists for category: ${category}`);
 
 				try {
-					// Get credentials and session
-					const credentials = await this.getCredentials('bunqApi');
-					const environment = credentials.environment as string;
-					const baseUrl = getBunqBaseUrl(environment);
-
-					this.logger.debug(`Using ${environment} environment, base URL: ${baseUrl}`);
-
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						credentials,
-						'n8n-bunq-webhook',
 						false,
 					);
 
@@ -178,18 +168,12 @@ export class BunqTrigger implements INodeType {
 
 					this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
-					// Get existing notification filters
-					const response = await this.helpers.httpRequest({
+					// Get existing notification filters using canonical HTTP client
+					const client = new BunqHttpClient(this);
+					const response = await client.request({
 						method: 'GET',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
-						headers: {
-							'Content-Type': 'application/json',
-							'Cache-Control': 'no-cache',
-							'User-Agent': 'n8n-bunq-webhook',
-							'X-Bunq-Language': 'en_US',
-							'X-Bunq-Region': 'nl_NL',
-							'X-Bunq-Client-Authentication': sessionData.sessionToken,
-						},
+						url: `/user/${sessionData.userId}/notification-filter-url`,
+						sessionToken: sessionData.sessionToken,
 					});
 
 					this.logger.debug(`Retrieved notification filters from Bunq API`);
@@ -230,18 +214,9 @@ export class BunqTrigger implements INodeType {
 
 				this.logger.info(`Creating webhook for category: ${category} at ${webhookUrl}`);
 
-				// Get credentials
-				const credentials = await this.getCredentials('bunqApi');
-				const environment = credentials.environment as string;
-				const baseUrl = getBunqBaseUrl(environment);
-
-				this.logger.debug(`Using ${environment} environment`);
-
 				// Ensure session exists using shared helper
 				const sessionData = await ensureBunqSession.call(
 					this,
-					credentials,
-					'n8n-bunq-webhook',
 					false,
 				);
 
@@ -265,25 +240,15 @@ export class BunqTrigger implements INodeType {
 					notification_filters: notificationFilters,
 				});
 
-				// Sign the payload
-				const signature = signData(payload, credentials.privateKey as string);
-
 				try {
 					this.logger.debug(`Registering webhook with Bunq API...`);
-					// Register the webhook with Bunq
-					await this.helpers.httpRequest({
+					// Register the webhook with Bunq using canonical HTTP client
+					const client = new BunqHttpClient(this);
+					await client.request({
 						method: 'POST',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
-						headers: {
-							'Content-Type': 'application/json',
-							'Cache-Control': 'no-cache',
-							'User-Agent': 'n8n-bunq-webhook',
-							'X-Bunq-Language': 'en_US',
-							'X-Bunq-Region': 'nl_NL',
-							'X-Bunq-Client-Authentication': sessionData.sessionToken,
-							'X-Bunq-Client-Signature': signature,
-						},
+						url: `/user/${sessionData.userId}/notification-filter-url`,
 						body: payload,
+						sessionToken: sessionData.sessionToken,
 					});
 
 					this.logger.info(`Successfully registered webhook for category ${category}`);
@@ -308,18 +273,9 @@ export class BunqTrigger implements INodeType {
 				this.logger.info(`Deleting webhook at ${webhookUrl}`);
 
 				try {
-					// Get credentials
-					const credentials = await this.getCredentials('bunqApi');
-					const environment = credentials.environment as string;
-					const baseUrl = getBunqBaseUrl(environment);
-
-					this.logger.debug(`Using ${environment} environment`);
-
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						credentials,
-						'n8n-bunq-webhook',
 						false,
 					);
 
@@ -333,18 +289,12 @@ export class BunqTrigger implements INodeType {
 
 					this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
-					// Get existing notification filters
-					const response = await this.helpers.httpRequest({
+					// Get existing notification filters using canonical HTTP client
+					const client = new BunqHttpClient(this);
+					const response = await client.request({
 						method: 'GET',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
-						headers: {
-							'Content-Type': 'application/json',
-							'Cache-Control': 'no-cache',
-							'User-Agent': 'n8n-bunq-webhook',
-							'X-Bunq-Language': 'en_US',
-							'X-Bunq-Region': 'nl_NL',
-							'X-Bunq-Client-Authentication': sessionData.sessionToken,
-						},
+						url: `/user/${sessionData.userId}/notification-filter-url`,
+						sessionToken: sessionData.sessionToken,
 					});
 
 					this.logger.debug('Retrieved existing notification filters');
@@ -370,26 +320,16 @@ export class BunqTrigger implements INodeType {
 
 					this.logger.debug(`Keeping ${filtersToKeep.length} filters, removing webhook ${webhookUrl}`);
 
-					// Update filters (removing ours)
+					// Update filters (removing ours) using canonical HTTP client
 					const payload = JSON.stringify({
 						notification_filters: filtersToKeep,
 					});
 
-					const signature = signData(payload, credentials.privateKey as string);
-
-					await this.helpers.httpRequest({
+					await client.request({
 						method: 'POST',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
-						headers: {
-							'Content-Type': 'application/json',
-							'Cache-Control': 'no-cache',
-							'User-Agent': 'n8n-bunq-webhook',
-							'X-Bunq-Language': 'en_US',
-							'X-Bunq-Region': 'nl_NL',
-							'X-Bunq-Client-Authentication': sessionData.sessionToken,
-							'X-Bunq-Client-Signature': signature,
-						},
+						url: `/user/${sessionData.userId}/notification-filter-url`,
 						body: payload,
+						sessionToken: sessionData.sessionToken,
 					});
 
 					this.logger.info('Successfully deleted webhook');
