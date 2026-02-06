@@ -65,7 +65,7 @@ export async function enforceRateLimit(
 	}
 
 	// Determine which rate limit to apply
-	const isSessionServer = url.includes('/session-server');
+	const isSessionServer = url.endsWith('/session-server');
 	let rateLimit: { maxRequests: number; windowMs: number };
 	let key: string;
 
@@ -116,8 +116,8 @@ export async function enforceRateLimit(
 			await sleep(waitMs);
 		}
 
-		// Start new window after sleeping
-		state.windowStart = Date.now();
+		// Reset window to the next expected window boundary
+		state.windowStart = state.windowStart + rateLimit.windowMs;
 		state.count = 0;
 	}
 
