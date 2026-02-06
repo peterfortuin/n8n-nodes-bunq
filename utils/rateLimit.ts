@@ -65,8 +65,16 @@ export async function enforceRateLimit(
 	}
 
 	// Determine which rate limit to apply
-	// Extract the path without query parameters for accurate endpoint detection
-	const urlPath = url.split('?')[0];
+	// Extract the path for accurate endpoint detection (handle both relative and absolute URLs)
+	let urlPath: string;
+	try {
+		// Try parsing as a full URL
+		const parsedUrl = new URL(url, 'https://dummy.com');
+		urlPath = parsedUrl.pathname;
+	} catch {
+		// If parsing fails, treat as a relative path and remove query params/fragments
+		urlPath = url.split('?')[0].split('#')[0];
+	}
 	const isSessionServer = urlPath === '/session-server' || urlPath.endsWith('/session-server');
 	let rateLimit: { maxRequests: number; windowMs: number };
 	let key: string;
@@ -95,6 +103,9 @@ export async function enforceRateLimit(
 	// Use 'global' scope so rate limits are enforced per credential across all workflows.
 	// This is correct because Bunq API rate limits apply to the credential/API key,
 	// not to individual workflows or nodes.
+	// Note: This implementation does not use locks/mutexes for simplicity. In n8n's typical
+	// usage patterns (sequential workflow execution), race conditions are rare and acceptable.
+	// For high-concurrency scenarios, consider adding a queuing mechanism.
 	const staticData = ctx.getWorkflowStaticData('global');
 	const now = Date.now();
 
