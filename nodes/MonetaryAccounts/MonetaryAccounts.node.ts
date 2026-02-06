@@ -60,7 +60,6 @@ export class MonetaryAccounts implements INodeType {
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-    const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
     try {
@@ -78,6 +77,7 @@ export class MonetaryAccounts implements INodeType {
       const client = new BunqHttpClient(this);
 
       // Fetch accounts for each selected type
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const allAccounts: Array<Record<string, any>> = [];
       
       for (const accountType of accountTypes) {
@@ -128,6 +128,7 @@ export class MonetaryAccounts implements INodeType {
 
       // If no accounts were found, return empty result for each input item
       if (returnData.length === 0) {
+        const items = this.getInputData();
         for (let i = 0; i < items.length; i++) {
           returnData.push({
             json: {
@@ -145,6 +146,7 @@ export class MonetaryAccounts implements INodeType {
 
     } catch (error) {
       if (this.continueOnFail()) {
+        const items = this.getInputData();
         // Return error data for all items if continueOnFail is enabled
         const returnData: INodeExecutionData[] = items.map((_, i) => ({
           json: {
