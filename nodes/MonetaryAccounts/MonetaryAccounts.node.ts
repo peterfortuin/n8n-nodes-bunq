@@ -21,7 +21,7 @@ export class MonetaryAccounts implements INodeType {
     version: 1,
     description: 'Retrieve a list of Monetary Accounts from Bunq API with type filtering',
     defaults: {
-      name: 'Monetary Accounts'
+      name: 'Get Monetary Accounts'
     },
     inputs: ['main'],
     outputs: ['main'],
