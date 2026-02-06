@@ -37,14 +37,12 @@ export function signData(data: string, privateKey: string): string {
  * Create installation with Bunq API
  * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param publicKey - The client's public key for installation
- * @param serviceName - Name of the service/application
  * @returns Installation token and server public key
  */
 export async function createInstallation(
   this: BunqApiContext,
   baseUrl: string,
-  publicKey: string,
-  serviceName: string
+  publicKey: string
 ): Promise<{ token: string; serverPublicKey: string }> {
   const payload = JSON.stringify({ client_public_key: publicKey });
 
@@ -53,7 +51,6 @@ export async function createInstallation(
     method: 'POST',
     url: '/installation',
     body: payload,
-    serviceName,
   });
 
   // Extract token and server public key from response
@@ -111,7 +108,6 @@ export async function registerDevice(
     url: '/device-server',
     body: payload,
     sessionToken: installationToken,
-    serviceName,
   });
 
   // Extract device ID from response
@@ -139,15 +135,13 @@ export async function registerDevice(
  * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param installationToken - Token from installation step
  * @param apiKey - The Bunq API key
- * @param serviceName - Name of the service/application
  * @returns Session token and user ID
  */
 export async function createSession(
   this: BunqApiContext,
   baseUrl: string,
   installationToken: string,
-  apiKey: string,
-  serviceName: string
+  apiKey: string
 ): Promise<{ token: string; userId: string }> {
   const payload = JSON.stringify({ secret: apiKey });
 
@@ -157,7 +151,6 @@ export async function createSession(
     url: '/session-server',
     body: payload,
     sessionToken: installationToken,
-    serviceName,
   });
 
   // Extract token and user ID from response
@@ -244,7 +237,7 @@ export async function ensureBunqSession(
 
   // Step 1: Create installation if needed
   if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-    const installationResult = await createInstallation.call(this, baseUrl, publicKey, serviceName);
+    const installationResult = await createInstallation.call(this, baseUrl, publicKey);
     sessionData.installationToken = installationResult.token;
     sessionData.serverPublicKey = installationResult.serverPublicKey;
     workflowStaticData.bunqSession = sessionData;
@@ -273,8 +266,7 @@ export async function ensureBunqSession(
       this,
       baseUrl,
       sessionData.installationToken!,
-      apiKey,
-      serviceName
+      apiKey
     );
     sessionData.sessionToken = sessionResult.token;
     sessionData.sessionCreatedAt = Date.now();

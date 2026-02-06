@@ -7,6 +7,9 @@ import {
 import { randomUUID } from 'crypto';
 import { signData, getBunqBaseUrl } from './bunqApiHelpers';
 
+// Import package version for User-Agent header
+import packageJson from '../package.json';
+
 /**
  * Type for Bunq API context - supports both execution and hook contexts
  */
@@ -20,11 +23,6 @@ export interface IBunqHttpRequestOptions {
 	url: string;
 	body?: string;
 	sessionToken?: string;
-	/**
-	 * Service name to use in User-Agent header.
-	 * Defaults to 'n8n-nodes-bunq' if not specified.
-	 */
-	serviceName?: string;
 	additionalHeaders?: Record<string, string>;
 }
 
@@ -66,6 +64,103 @@ export class BunqHttpClient {
 	}
 
 	/**
+	 * Enhance error with detailed API response information
+	 * @param error - The original error object
+	 * @param requestId - The request ID that was sent
+	 * @param method - The HTTP method used
+	 * @param fullUrl - The full URL of the request
+	 */
+	private enhanceErrorWithDetails(
+		error: unknown,
+		requestId: string,
+		method: string,
+		fullUrl: string,
+	): void {
+		if (error && typeof error === 'object' && 'response' in error) {
+			const errorWithResponse = error as {
+				response?: {
+					status?: number;
+					headers?: Record<string, string>;
+					data?: unknown;
+					statusText?: string;
+				};
+				config?: {
+					url?: string;
+					method?: string;
+					headers?: Record<string, string>;
+				};
+				message?: string;
+			};
+
+			if (errorWithResponse.response) {
+				const statusCode = errorWithResponse.response.status;
+				const responseId =
+					errorWithResponse.response.headers?.['x-bunq-client-response-id'] || 'N/A';
+				const callTime =
+					errorWithResponse.response.headers?.['date'] || new Date().toUTCString();
+				const endpoint = errorWithResponse.config?.url || fullUrl;
+
+				// Log error details for 4xx and 5xx errors
+				if (statusCode && statusCode >= 400) {
+					this.context.logger.error('Bunq API Error', {
+						environment: this.environment,
+						requestId,
+						responseId,
+						callTime,
+						endpoint,
+						statusCode,
+						statusText: errorWithResponse.response.statusText,
+						responseData: errorWithResponse.response.data,
+					});
+				}
+
+				const errorDetails = {
+					environment: this.environment,
+					requestId,
+					responseId,
+					callTime,
+					endpoint,
+					statusCode,
+					statusText: errorWithResponse.response.statusText,
+					data: errorWithResponse.response.data,
+					method: errorWithResponse.config?.method || method,
+				};
+
+				// Safely stringify error details, handling circular references
+				let errorDetailsString: string;
+				try {
+					errorDetailsString = JSON.stringify(errorDetails, null, 2);
+				} catch {
+					// If circular reference error, create a safe version with just primitives
+					errorDetailsString = JSON.stringify(
+						{
+							environment: this.environment,
+							requestId,
+							responseId,
+							callTime,
+							endpoint,
+							statusCode,
+							statusText: errorWithResponse.response.statusText,
+							data:
+								typeof errorWithResponse.response.data === 'object'
+									? '[Complex Object]'
+									: errorWithResponse.response.data,
+							method: errorWithResponse.config?.method || method,
+						},
+						null,
+						2,
+					);
+				}
+
+				const originalMessage = errorWithResponse.message || 'API request failed';
+				if (error instanceof Error) {
+					error.message = `${originalMessage}\n\nAPI Response Details:\n${errorDetailsString}`;
+				}
+			}
+		}
+	}
+
+	/**
 	 * Make a request to the Bunq API with automatic header management and error handling
 	 */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,7 +173,6 @@ export class BunqHttpClient {
 			url,
 			body,
 			sessionToken,
-			serviceName = 'n8n-nodes-bunq',
 			additionalHeaders = {},
 		} = options;
 
@@ -88,11 +182,14 @@ export class BunqHttpClient {
 		// Build full URL with baseUrl
 		const fullUrl = `${this.baseUrl}${url}`;
 
+		// Build User-Agent with package name and version
+		const userAgent = `${packageJson.name}/${packageJson.version}`;
+
 		// Build headers with automatic management
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json',
 			'Cache-Control': 'no-cache',
-			'User-Agent': serviceName,
+			'User-Agent': userAgent,
 			'X-Bunq-Language': 'en_US',
 			'X-Bunq-Region': 'nl_NL',
 			'X-Bunq-Client-Request-Id': requestId,
@@ -127,89 +224,7 @@ export class BunqHttpClient {
 			return response;
 		} catch (error: unknown) {
 			// Enhance error message with response details if available
-			if (error && typeof error === 'object' && 'response' in error) {
-				const errorWithResponse = error as {
-					response?: {
-						status?: number;
-						headers?: Record<string, string>;
-						data?: unknown;
-						statusText?: string;
-					};
-					config?: {
-						url?: string;
-						method?: string;
-						headers?: Record<string, string>;
-					};
-					message?: string;
-				};
-
-				if (errorWithResponse.response) {
-					const statusCode = errorWithResponse.response.status;
-					const responseId =
-						errorWithResponse.response.headers?.['x-bunq-client-response-id'] || 'N/A';
-					const callTime =
-						errorWithResponse.response.headers?.['date'] || new Date().toUTCString();
-					const endpoint = errorWithResponse.config?.url || fullUrl;
-
-					// Log error details for 4xx and 5xx errors
-					if (statusCode && statusCode >= 400) {
-						this.context.logger.error('Bunq API Error', {
-							environment: this.environment,
-							requestId,
-							responseId,
-							callTime,
-							endpoint,
-							statusCode,
-							statusText: errorWithResponse.response.statusText,
-							responseData: errorWithResponse.response.data,
-						});
-					}
-
-					const errorDetails = {
-						environment: this.environment,
-						requestId,
-						responseId,
-						callTime,
-						endpoint,
-						statusCode,
-						statusText: errorWithResponse.response.statusText,
-						data: errorWithResponse.response.data,
-						method: errorWithResponse.config?.method || method,
-					};
-
-					// Safely stringify error details, handling circular references
-					let errorDetailsString: string;
-					try {
-						errorDetailsString = JSON.stringify(errorDetails, null, 2);
-					} catch {
-						// If circular reference error, create a safe version with just primitives
-						errorDetailsString = JSON.stringify(
-							{
-								environment: this.environment,
-								requestId,
-								responseId,
-								callTime,
-								endpoint,
-								statusCode,
-								statusText: errorWithResponse.response.statusText,
-								data:
-									typeof errorWithResponse.response.data === 'object'
-										? '[Complex Object]'
-										: errorWithResponse.response.data,
-								method: errorWithResponse.config?.method || method,
-							},
-							null,
-							2,
-						);
-					}
-
-					const originalMessage = errorWithResponse.message || 'API request failed';
-					if (error instanceof Error) {
-						error.message = `${originalMessage}\n\nAPI Response Details:\n${errorDetailsString}`;
-					}
-				}
-			}
-
+			this.enhanceErrorWithDetails(error, requestId, method, fullUrl);
 			throw error;
 		}
 	}
