@@ -158,8 +158,6 @@ export class BunqTrigger implements INodeType {
 					// Get credentials and session
 					const credentials = await this.getCredentials('bunqApi');
 
-					this.logger.debug(`Using ${credentials.environment} environment`);
-
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
@@ -181,7 +179,6 @@ export class BunqTrigger implements INodeType {
 						method: 'GET',
 						url: `/user/${sessionData.userId}/notification-filter-url`,
 						sessionToken: sessionData.sessionToken,
-						serviceName: 'n8n-bunq-webhook',
 					});
 
 					this.logger.debug(`Retrieved notification filters from Bunq API`);
@@ -225,8 +222,6 @@ export class BunqTrigger implements INodeType {
 				// Get credentials
 				const credentials = await this.getCredentials('bunqApi');
 
-				this.logger.debug(`Using ${credentials.environment} environment`);
-
 				// Ensure session exists using shared helper
 				const sessionData = await ensureBunqSession.call(
 					this,
@@ -264,8 +259,6 @@ export class BunqTrigger implements INodeType {
 						url: `/user/${sessionData.userId}/notification-filter-url`,
 						body: payload,
 						sessionToken: sessionData.sessionToken,
-						privateKey: credentials.privateKey as string,
-						serviceName: 'n8n-bunq-webhook',
 					});
 
 					this.logger.info(`Successfully registered webhook for category ${category}`);
@@ -293,8 +286,6 @@ export class BunqTrigger implements INodeType {
 					// Get credentials
 					const credentials = await this.getCredentials('bunqApi');
 
-					this.logger.debug(`Using ${credentials.environment} environment`);
-
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
@@ -319,7 +310,6 @@ export class BunqTrigger implements INodeType {
 						method: 'GET',
 						url: `/user/${sessionData.userId}/notification-filter-url`,
 						sessionToken: sessionData.sessionToken,
-						serviceName: 'n8n-bunq-webhook',
 					});
 
 					this.logger.debug('Retrieved existing notification filters');
@@ -355,8 +345,6 @@ export class BunqTrigger implements INodeType {
 						url: `/user/${sessionData.userId}/notification-filter-url`,
 						body: payload,
 						sessionToken: sessionData.sessionToken,
-						privateKey: credentials.privateKey as string,
-						serviceName: 'n8n-bunq-webhook',
 					});
 
 					this.logger.info('Successfully deleted webhook');

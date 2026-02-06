@@ -20,13 +20,9 @@ export interface IBunqHttpRequestOptions {
 	url: string;
 	body?: string;
 	sessionToken?: string;
-	privateKey?: string;
 	/**
 	 * Service name to use in User-Agent header.
-	 * Different service names can be used for different contexts:
-	 * - 'n8n-bunq-integration': For general API operations (default)
-	 * - 'n8n-bunq-webhook': For webhook-related operations
-	 * This helps identify the source of API calls in Bunq logs.
+	 * Defaults to 'n8n-nodes-bunq' if not specified.
 	 */
 	serviceName?: string;
 	additionalHeaders?: Record<string, string>;
@@ -40,6 +36,7 @@ export class BunqHttpClient {
 	private context: BunqApiContext;
 	private environment: string;
 	private baseUrl: string;
+	private privateKey: string;
 
 	/**
 	 * Create a new BunqHttpClient
@@ -49,6 +46,7 @@ export class BunqHttpClient {
 		this.context = context;
 		this.environment = '';
 		this.baseUrl = '';
+		this.privateKey = '';
 	}
 
 	/**
@@ -64,6 +62,7 @@ export class BunqHttpClient {
 		const credentials = await this.context.getCredentials('bunqApi');
 		this.environment = credentials.environment as string;
 		this.baseUrl = getBunqBaseUrl(this.environment);
+		this.privateKey = credentials.privateKey as string;
 	}
 
 	/**
@@ -79,8 +78,7 @@ export class BunqHttpClient {
 			url,
 			body,
 			sessionToken,
-			privateKey,
-			serviceName = 'n8n-bunq-integration',
+			serviceName = 'n8n-nodes-bunq',
 			additionalHeaders = {},
 		} = options;
 
@@ -107,8 +105,8 @@ export class BunqHttpClient {
 		}
 
 		// Add signature header only when there is a request body
-		if (body && privateKey) {
-			const signature = signData(body, privateKey);
+		if (body && this.privateKey) {
+			const signature = signData(body, this.privateKey);
 			headers['X-Bunq-Client-Signature'] = signature;
 		}
 

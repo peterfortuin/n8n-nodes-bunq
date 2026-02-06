@@ -140,7 +140,6 @@ export async function registerDevice(
  * @param installationToken - Token from installation step
  * @param apiKey - The Bunq API key
  * @param serviceName - Name of the service/application
- * @param privateKey - Private key for signing the request
  * @returns Session token and user ID
  */
 export async function createSession(
@@ -148,8 +147,7 @@ export async function createSession(
   baseUrl: string,
   installationToken: string,
   apiKey: string,
-  serviceName: string,
-  privateKey: string
+  serviceName: string
 ): Promise<{ token: string; userId: string }> {
   const payload = JSON.stringify({ secret: apiKey });
 
@@ -159,7 +157,6 @@ export async function createSession(
     url: '/session-server',
     body: payload,
     sessionToken: installationToken,
-    privateKey,
     serviceName,
   });
 
@@ -231,7 +228,6 @@ export async function ensureBunqSession(
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
   const apiKey = credentials.apiKey as string;
-  const privateKey = credentials.privateKey as string;
   const publicKey = credentials.publicKey as string;
   const environment = credentials.environment as string;
   const baseUrl = getBunqBaseUrl(environment);
@@ -278,8 +274,7 @@ export async function ensureBunqSession(
       baseUrl,
       sessionData.installationToken!,
       apiKey,
-      serviceName,
-      privateKey
+      serviceName
     );
     sessionData.sessionToken = sessionResult.token;
     sessionData.sessionCreatedAt = Date.now();
