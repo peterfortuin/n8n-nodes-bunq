@@ -21,6 +21,13 @@ export interface IBunqHttpRequestOptions {
 	body?: string;
 	sessionToken?: string;
 	privateKey?: string;
+	/**
+	 * Service name to use in User-Agent header.
+	 * Different service names can be used for different contexts:
+	 * - 'n8n-bunq-integration': For general API operations (default)
+	 * - 'n8n-bunq-webhook': For webhook-related operations
+	 * This helps identify the source of API calls in Bunq logs.
+	 */
 	serviceName?: string;
 	additionalHeaders?: Record<string, string>;
 }
@@ -33,6 +40,11 @@ export class BunqHttpClient {
 	private context: BunqApiContext;
 	private environment: string;
 
+	/**
+	 * Create a new BunqHttpClient
+	 * @param context - The n8n execution or hook context
+	 * @param environment - The Bunq environment ('sandbox' or 'production') for error logging and tracking
+	 */
 	constructor(context: BunqApiContext, environment: string) {
 		this.context = context;
 		this.environment = environment;

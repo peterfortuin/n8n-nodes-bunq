@@ -35,6 +35,11 @@ export function signData(data: string, privateKey: string): string {
 
 /**
  * Create installation with Bunq API
+ * @param baseUrl - The Bunq API base URL (production or sandbox)
+ * @param publicKey - The client's public key for installation
+ * @param serviceName - Name of the service/application
+ * @param environment - The environment ('sandbox' or 'production') for error logging
+ * @returns Installation token and server public key
  */
 export async function createInstallation(
   this: BunqApiContext,
@@ -83,6 +88,12 @@ export async function createInstallation(
  * to the IP address of the caller. This provides better security but requires that
  * API calls come from the same IP address. If your IP changes (e.g., dynamic IPs,
  * mobile networks, VPN), you'll need to re-register the device.
+ * @param baseUrl - The Bunq API base URL (production or sandbox)
+ * @param installationToken - Token from installation step
+ * @param apiKey - The Bunq API key
+ * @param serviceName - Name of the service/application
+ * @param environment - The environment ('sandbox' or 'production') for error logging
+ * @returns Device ID
  */
 export async function registerDevice(
   this: BunqApiContext,
@@ -129,6 +140,13 @@ export async function registerDevice(
 
 /**
  * Create session with Bunq API
+ * @param baseUrl - The Bunq API base URL (production or sandbox)
+ * @param installationToken - Token from installation step
+ * @param apiKey - The Bunq API key
+ * @param serviceName - Name of the service/application
+ * @param privateKey - Private key for signing the request
+ * @param environment - The environment ('sandbox' or 'production') for error logging
+ * @returns Session token and user ID
  */
 export async function createSession(
   this: BunqApiContext,
