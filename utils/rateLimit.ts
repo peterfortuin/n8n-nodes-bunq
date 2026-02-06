@@ -65,7 +65,9 @@ export async function enforceRateLimit(
 	}
 
 	// Determine which rate limit to apply
-	const isSessionServer = url.endsWith('/session-server');
+	// Extract the path without query parameters for accurate endpoint detection
+	const urlPath = url.split('?')[0];
+	const isSessionServer = urlPath === '/session-server' || urlPath.endsWith('/session-server');
 	let rateLimit: { maxRequests: number; windowMs: number };
 	let key: string;
 
@@ -90,6 +92,9 @@ export async function enforceRateLimit(
 	}
 
 	// Get or initialize rate limit state from workflow static data
+	// Use 'global' scope so rate limits are enforced per credential across all workflows.
+	// This is correct because Bunq API rate limits apply to the credential/API key,
+	// not to individual workflows or nodes.
 	const staticData = ctx.getWorkflowStaticData('global');
 	const now = Date.now();
 
@@ -116,8 +121,8 @@ export async function enforceRateLimit(
 			await sleep(waitMs);
 		}
 
-		// Reset window to the next expected window boundary
-		state.windowStart = state.windowStart + rateLimit.windowMs;
+		// Start new window after sleeping (use current time to account for any delays)
+		state.windowStart = Date.now();
 		state.count = 0;
 	}
 
