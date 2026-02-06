@@ -5,7 +5,7 @@ import {
 	IHttpRequestOptions,
 } from 'n8n-workflow';
 import { randomUUID } from 'crypto';
-import { signData } from './bunqApiHelpers';
+import { signData, getBunqBaseUrl } from './bunqApiHelpers';
 
 /**
  * Type for Bunq API context - supports both execution and hook contexts
@@ -39,15 +39,31 @@ export interface IBunqHttpRequestOptions {
 export class BunqHttpClient {
 	private context: BunqApiContext;
 	private environment: string;
+	private baseUrl: string;
 
 	/**
 	 * Create a new BunqHttpClient
 	 * @param context - The n8n execution or hook context
-	 * @param environment - The Bunq environment ('sandbox' or 'production') for error logging and tracking
 	 */
-	constructor(context: BunqApiContext, environment: string) {
+	constructor(context: BunqApiContext) {
 		this.context = context;
-		this.environment = environment;
+		this.environment = '';
+		this.baseUrl = '';
+	}
+
+	/**
+	 * Initialize the client by retrieving credentials and setting up environment
+	 * This must be called before making any requests
+	 */
+	private async initialize(): Promise<void> {
+		if (this.environment) {
+			// Already initialized
+			return;
+		}
+		
+		const credentials = await this.context.getCredentials('bunqApi');
+		this.environment = credentials.environment as string;
+		this.baseUrl = getBunqBaseUrl(this.environment);
 	}
 
 	/**
@@ -55,6 +71,9 @@ export class BunqHttpClient {
 	 */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	async request(options: IBunqHttpRequestOptions): Promise<any> {
+		// Initialize if not already done
+		await this.initialize();
+
 		const {
 			method,
 			url,
@@ -67,6 +86,9 @@ export class BunqHttpClient {
 
 		// Generate request ID for tracking
 		const requestId = randomUUID();
+
+		// Build full URL with baseUrl
+		const fullUrl = `${this.baseUrl}${url}`;
 
 		// Build headers with automatic management
 		const headers: Record<string, string> = {
@@ -93,7 +115,7 @@ export class BunqHttpClient {
 		// Build HTTP request options
 		const httpRequestOptions: IHttpRequestOptions = {
 			method,
-			url,
+			url: fullUrl,
 			headers,
 		};
 
@@ -129,7 +151,7 @@ export class BunqHttpClient {
 						errorWithResponse.response.headers?.['x-bunq-client-response-id'] || 'N/A';
 					const callTime =
 						errorWithResponse.response.headers?.['date'] || new Date().toUTCString();
-					const endpoint = errorWithResponse.config?.url || url;
+					const endpoint = errorWithResponse.config?.url || fullUrl;
 
 					// Log error details for 4xx and 5xx errors
 					if (statusCode && statusCode >= 400) {

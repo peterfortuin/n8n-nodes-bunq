@@ -7,7 +7,6 @@ import {
 	NodeApiError,
 } from 'n8n-workflow';
 import {
-	getBunqBaseUrl,
 	ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
@@ -158,10 +157,8 @@ export class BunqTrigger implements INodeType {
 				try {
 					// Get credentials and session
 					const credentials = await this.getCredentials('bunqApi');
-					const environment = credentials.environment as string;
-					const baseUrl = getBunqBaseUrl(environment);
 
-					this.logger.debug(`Using ${environment} environment, base URL: ${baseUrl}`);
+					this.logger.debug(`Using ${credentials.environment} environment`);
 
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
@@ -179,10 +176,10 @@ export class BunqTrigger implements INodeType {
 					this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
 					// Get existing notification filters using canonical HTTP client
-					const client = new BunqHttpClient(this, environment);
+					const client = new BunqHttpClient(this);
 					const response = await client.request({
 						method: 'GET',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						url: `/user/${sessionData.userId}/notification-filter-url`,
 						sessionToken: sessionData.sessionToken,
 						serviceName: 'n8n-bunq-webhook',
 					});
@@ -227,10 +224,8 @@ export class BunqTrigger implements INodeType {
 
 				// Get credentials
 				const credentials = await this.getCredentials('bunqApi');
-				const environment = credentials.environment as string;
-				const baseUrl = getBunqBaseUrl(environment);
 
-				this.logger.debug(`Using ${environment} environment`);
+				this.logger.debug(`Using ${credentials.environment} environment`);
 
 				// Ensure session exists using shared helper
 				const sessionData = await ensureBunqSession.call(
@@ -263,10 +258,10 @@ export class BunqTrigger implements INodeType {
 				try {
 					this.logger.debug(`Registering webhook with Bunq API...`);
 					// Register the webhook with Bunq using canonical HTTP client
-					const client = new BunqHttpClient(this, environment);
+					const client = new BunqHttpClient(this);
 					await client.request({
 						method: 'POST',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						url: `/user/${sessionData.userId}/notification-filter-url`,
 						body: payload,
 						sessionToken: sessionData.sessionToken,
 						privateKey: credentials.privateKey as string,
@@ -297,10 +292,8 @@ export class BunqTrigger implements INodeType {
 				try {
 					// Get credentials
 					const credentials = await this.getCredentials('bunqApi');
-					const environment = credentials.environment as string;
-					const baseUrl = getBunqBaseUrl(environment);
 
-					this.logger.debug(`Using ${environment} environment`);
+					this.logger.debug(`Using ${credentials.environment} environment`);
 
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
@@ -321,10 +314,10 @@ export class BunqTrigger implements INodeType {
 					this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
 					// Get existing notification filters using canonical HTTP client
-					const client = new BunqHttpClient(this, environment);
+					const client = new BunqHttpClient(this);
 					const response = await client.request({
 						method: 'GET',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						url: `/user/${sessionData.userId}/notification-filter-url`,
 						sessionToken: sessionData.sessionToken,
 						serviceName: 'n8n-bunq-webhook',
 					});
@@ -359,7 +352,7 @@ export class BunqTrigger implements INodeType {
 
 					await client.request({
 						method: 'POST',
-						url: `${baseUrl}/user/${sessionData.userId}/notification-filter-url`,
+						url: `/user/${sessionData.userId}/notification-filter-url`,
 						body: payload,
 						sessionToken: sessionData.sessionToken,
 						privateKey: credentials.privateKey as string,

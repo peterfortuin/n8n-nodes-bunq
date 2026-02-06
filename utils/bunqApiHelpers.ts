@@ -38,22 +38,20 @@ export function signData(data: string, privateKey: string): string {
  * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param publicKey - The client's public key for installation
  * @param serviceName - Name of the service/application
- * @param environment - The environment ('sandbox' or 'production') for error logging
  * @returns Installation token and server public key
  */
 export async function createInstallation(
   this: BunqApiContext,
   baseUrl: string,
   publicKey: string,
-  serviceName: string,
-  environment: string
+  serviceName: string
 ): Promise<{ token: string; serverPublicKey: string }> {
   const payload = JSON.stringify({ client_public_key: publicKey });
 
-  const client = new BunqHttpClient(this, environment);
+  const client = new BunqHttpClient(this);
   const response = await client.request({
     method: 'POST',
-    url: `${baseUrl}/installation`,
+    url: '/installation',
     body: payload,
     serviceName,
   });
@@ -92,7 +90,6 @@ export async function createInstallation(
  * @param installationToken - Token from installation step
  * @param apiKey - The Bunq API key
  * @param serviceName - Name of the service/application
- * @param environment - The environment ('sandbox' or 'production') for error logging
  * @returns Device ID
  */
 export async function registerDevice(
@@ -100,8 +97,7 @@ export async function registerDevice(
   baseUrl: string,
   installationToken: string,
   apiKey: string,
-  serviceName: string,
-  environment: string
+  serviceName: string
 ): Promise<string> {
   // By not including permitted_ips, Bunq automatically locks device to caller's IP
   const payload = JSON.stringify({
@@ -109,10 +105,10 @@ export async function registerDevice(
     secret: apiKey,
   });
 
-  const client = new BunqHttpClient(this, environment);
+  const client = new BunqHttpClient(this);
   const response = await client.request({
     method: 'POST',
-    url: `${baseUrl}/device-server`,
+    url: '/device-server',
     body: payload,
     sessionToken: installationToken,
     serviceName,
@@ -145,7 +141,6 @@ export async function registerDevice(
  * @param apiKey - The Bunq API key
  * @param serviceName - Name of the service/application
  * @param privateKey - Private key for signing the request
- * @param environment - The environment ('sandbox' or 'production') for error logging
  * @returns Session token and user ID
  */
 export async function createSession(
@@ -154,15 +149,14 @@ export async function createSession(
   installationToken: string,
   apiKey: string,
   serviceName: string,
-  privateKey: string,
-  environment: string
+  privateKey: string
 ): Promise<{ token: string; userId: string }> {
   const payload = JSON.stringify({ secret: apiKey });
 
-  const client = new BunqHttpClient(this, environment);
+  const client = new BunqHttpClient(this);
   const response = await client.request({
     method: 'POST',
-    url: `${baseUrl}/session-server`,
+    url: '/session-server',
     body: payload,
     sessionToken: installationToken,
     privateKey,
@@ -254,7 +248,7 @@ export async function ensureBunqSession(
 
   // Step 1: Create installation if needed
   if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-    const installationResult = await createInstallation.call(this, baseUrl, publicKey, serviceName, environment);
+    const installationResult = await createInstallation.call(this, baseUrl, publicKey, serviceName);
     sessionData.installationToken = installationResult.token;
     sessionData.serverPublicKey = installationResult.serverPublicKey;
     workflowStaticData.bunqSession = sessionData;
@@ -267,8 +261,7 @@ export async function ensureBunqSession(
       baseUrl,
       sessionData.installationToken!,
       apiKey,
-      serviceName,
-      environment
+      serviceName
     );
     sessionData.deviceServerId = deviceId;
     workflowStaticData.bunqSession = sessionData;
@@ -286,8 +279,7 @@ export async function ensureBunqSession(
       sessionData.installationToken!,
       apiKey,
       serviceName,
-      privateKey,
-      environment
+      privateKey
     );
     sessionData.sessionToken = sessionResult.token;
     sessionData.sessionCreatedAt = Date.now();
