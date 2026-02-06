@@ -60,8 +60,7 @@ export async function enforceRateLimit(
 	const creds = await ctx.getCredentials('bunqApi');
 
 	if (!creds?.id) {
-		// No credentials = no rate limit enforcement
-		return;
+		throw new Error('Missing credential ID for rate limit enforcement');
 	}
 
 	// Determine which rate limit to apply
@@ -86,15 +85,19 @@ export async function enforceRateLimit(
 	} else {
 		// Per-method rate limits
 		const upperMethod = method.toUpperCase();
-		if (upperMethod === 'GET') {
-			rateLimit = RATE_LIMITS.GET;
-		} else if (upperMethod === 'POST') {
-			rateLimit = RATE_LIMITS.POST;
-		} else if (upperMethod === 'PUT') {
-			rateLimit = RATE_LIMITS.PUT;
-		} else {
-			// No rate limit for other methods (DELETE, PATCH, etc.)
-			return;
+		switch (upperMethod) {
+			case 'GET':
+				rateLimit = RATE_LIMITS.GET;
+				break;
+			case 'POST':
+				rateLimit = RATE_LIMITS.POST;
+				break;
+			case 'PUT':
+				rateLimit = RATE_LIMITS.PUT;
+				break;
+			default:
+				// No rate limit for other methods (DELETE, PATCH, etc.)
+				return;
 		}
 		key = `rateLimit:bunqApi:${creds.id}:${upperMethod}`;
 	}
@@ -114,12 +117,22 @@ export async function enforceRateLimit(
 			windowStart: now,
 			count: 0,
 		} as RateLimitState;
+		ctx.logger.debug(`Rate limit window started for ${key}`, {
+			windowStart: now,
+			maxRequests: rateLimit.maxRequests,
+			windowMs: rateLimit.windowMs,
+		});
 	}
 
 	const state = staticData[key] as RateLimitState;
 
 	// Reset window if expired
 	if (now - state.windowStart >= rateLimit.windowMs) {
+		ctx.logger.debug(`Rate limit window reset for ${key}`, {
+			oldWindowStart: state.windowStart,
+			newWindowStart: now,
+			oldCount: state.count,
+		});
 		state.windowStart = now;
 		state.count = 0;
 	}
@@ -129,11 +142,21 @@ export async function enforceRateLimit(
 		const waitMs = rateLimit.windowMs - (now - state.windowStart);
 
 		if (waitMs > 0) {
+			ctx.logger.debug(`Rate limit reached for ${key}, sleeping for ${waitMs}ms`, {
+				currentCount: state.count,
+				maxRequests: rateLimit.maxRequests,
+				waitMs,
+			});
 			await sleep(waitMs);
 		}
 
 		// Start new window after sleeping (use current time to account for any delays)
-		state.windowStart = Date.now();
+		const newWindowStart = Date.now();
+		ctx.logger.debug(`Rate limit window reset after sleep for ${key}`, {
+			oldWindowStart: state.windowStart,
+			newWindowStart,
+		});
+		state.windowStart = newWindowStart;
 		state.count = 0;
 	}
 
