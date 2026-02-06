@@ -155,14 +155,9 @@ export class BunqTrigger implements INodeType {
 				this.logger.debug(`Checking if webhook exists for category: ${category}`);
 
 				try {
-					// Get credentials and session
-					const credentials = await this.getCredentials('bunqApi');
-
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						credentials,
-						'n8n-bunq-webhook',
 						false,
 					);
 
@@ -219,14 +214,9 @@ export class BunqTrigger implements INodeType {
 
 				this.logger.info(`Creating webhook for category: ${category} at ${webhookUrl}`);
 
-				// Get credentials
-				const credentials = await this.getCredentials('bunqApi');
-
 				// Ensure session exists using shared helper
 				const sessionData = await ensureBunqSession.call(
 					this,
-					credentials,
-					'n8n-bunq-webhook',
 					false,
 				);
 
@@ -283,14 +273,9 @@ export class BunqTrigger implements INodeType {
 				this.logger.info(`Deleting webhook at ${webhookUrl}`);
 
 				try {
-					// Get credentials
-					const credentials = await this.getCredentials('bunqApi');
-
 					// Ensure session exists using shared helper
 					const sessionData = await ensureBunqSession.call(
 						this,
-						credentials,
-						'n8n-bunq-webhook',
 						false,
 					);
 

@@ -1,6 +1,7 @@
-import { IExecuteFunctions, IHookFunctions, ICredentialDataDecryptedObject, NodeApiError } from 'n8n-workflow';
+import { IExecuteFunctions, IHookFunctions, NodeApiError } from 'n8n-workflow';
 import * as crypto from 'crypto';
 import { BunqHttpClient } from './BunqHttpClient';
+import packageJson from '../package.json';
 
 /**
  * Type for Bunq API context - supports both execution and hook contexts
@@ -86,16 +87,17 @@ export async function createInstallation(
  * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param installationToken - Token from installation step
  * @param apiKey - The Bunq API key
- * @param serviceName - Name of the service/application
  * @returns Device ID
  */
 export async function registerDevice(
   this: BunqApiContext,
   baseUrl: string,
   installationToken: string,
-  apiKey: string,
-  serviceName: string
+  apiKey: string
 ): Promise<string> {
+  // Use package name and version for device description
+  const serviceName = `${packageJson.name}/${packageJson.version}`;
+  
   // By not including permitted_ips, Bunq automatically locks device to caller's IP
   const payload = JSON.stringify({
     description: serviceName,
@@ -204,22 +206,19 @@ export interface IBunqSessionData {
 }
 
 /**
- * Ensure Bunq session is created and valid
- * This function manages the complete session lifecycle: installation, device registration, and session creation.
- * Each step is only performed if required (e.g., installation only if no token exists).
- * 
- * @param executeFunctions - The n8n execution context (IExecuteFunctions or IHookFunctions)
- * @param credentials - The Bunq API credentials object from getCredentials('bunqApi')
- * @param serviceName - Name of the service/application
- * @param forceRecreate - Whether to force recreation of the session
+ * Ensures a valid Bunq session exists or creates one if needed.
+ * Manages the complete session lifecycle including installation, device registration, and session creation.
+ * @param this - The Bunq API context (IExecuteFunctions or IHookFunctions)
+ * @param forceRecreate - If true, forces recreation of all session data
  * @returns Session data with all tokens and IDs
  */
 export async function ensureBunqSession(
   this: BunqApiContext,
-  credentials: ICredentialDataDecryptedObject,
-  serviceName: string,
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
+  // Retrieve credentials from context
+  const credentials = await this.getCredentials('bunqApi');
+  
   const apiKey = credentials.apiKey as string;
   const publicKey = credentials.publicKey as string;
   const environment = credentials.environment as string;
@@ -249,8 +248,7 @@ export async function ensureBunqSession(
       this,
       baseUrl,
       sessionData.installationToken!,
-      apiKey,
-      serviceName
+      apiKey
     );
     sessionData.deviceServerId = deviceId;
     workflowStaticData.bunqSession = sessionData;

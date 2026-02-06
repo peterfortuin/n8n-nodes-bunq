@@ -37,13 +37,6 @@ export class BunqSession implements INodeType {
         default: false,
         description: 'Whether to force recreation of the entire session (installation, device, and session)',
       },
-      {
-        displayName: 'Service Name',
-        name: 'serviceName',
-        type: 'string',
-        default: 'n8n-bunq-integration',
-        description: 'The name of your service/application for device registration',
-      },
     ]
   };
 
@@ -53,18 +46,15 @@ export class BunqSession implements INodeType {
     try {
       // Session creation logic (runs once, not per item)
       const forceRecreate = this.getNodeParameter('forceRecreate', 0) as boolean;
-      const serviceName = this.getNodeParameter('serviceName', 0) as string;
-
-      const credentials = await this.getCredentials('bunqApi');
-      const environment = credentials.environment as string;
 
       // Use the shared session management function
       const sessionData = await ensureBunqSession.call(
         this,
-        credentials,
-        serviceName,
         forceRecreate
       );
+
+      const credentials = await this.getCredentials('bunqApi');
+      const environment = credentials.environment as string;
 
       // Return the session data for all items
       const returnData: INodeExecutionData[] = items.map(() => ({
