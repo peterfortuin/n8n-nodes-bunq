@@ -53,9 +53,6 @@ export class BunqSession implements INodeType {
         forceRecreate
       );
 
-      const credentials = await this.getCredentials('bunqApi');
-      const environment = credentials.environment as string;
-
       // Return the session data for all items
       const returnData: INodeExecutionData[] = items.map(() => ({
         json: {
@@ -65,7 +62,7 @@ export class BunqSession implements INodeType {
           userId: sessionData.userId,
           sessionCreatedAt: sessionData.sessionCreatedAt,
           sessionAge: sessionData.sessionCreatedAt ? Date.now() - sessionData.sessionCreatedAt : 0,
-          environment,
+          environment: sessionData.environment,
         }
       }));
 

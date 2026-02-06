@@ -203,6 +203,7 @@ export interface IBunqSessionData {
   sessionToken?: string;
   sessionCreatedAt?: number;
   userId?: string;
+  environment?: string;
 }
 
 /**
@@ -272,5 +273,8 @@ export async function ensureBunqSession(
     workflowStaticData.bunqSession = sessionData;
   }
 
+  // Always include environment in returned session data
+  sessionData.environment = environment;
+  
   return sessionData;
 }
