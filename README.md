@@ -20,6 +20,20 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 This package includes the following nodes:
 
+### Bunq Monetary Accounts
+A node that retrieves a list of Monetary Accounts from the Bunq API with type filtering. Each account is returned as a separate n8n item for easy processing in workflows.
+
+**Features:**
+- Multiselect option to choose which account types to retrieve
+- Returns each account as a separate n8n item
+- Automatic session management
+- Support for all Bunq monetary account types
+
+**Account Types:**
+- **Bank**: Classic personal or business bank accounts
+- **Savings**: Regular or auto-savings accounts (including VAT accounts)
+- **Joint**: Shared accounts with other bunq users (legal co-owners)
+
 ### Bunq Trigger
 A trigger node that starts your workflow when Bunq sends a webhook notification. The trigger automatically registers and manages webhooks with the Bunq API.
 
