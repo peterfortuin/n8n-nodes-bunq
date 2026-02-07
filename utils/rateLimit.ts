@@ -1,4 +1,5 @@
 import type { IExecuteFunctions, IHookFunctions } from 'n8n-workflow';
+import { createHash } from 'crypto';
 
 /**
  * Type for Bunq API context - supports both execution and hook contexts
@@ -29,18 +30,28 @@ export const RATE_LIMITS = {
 };
 
 /**
- * Rate limit state stored in workflow static data
+ * Rate limit state stored in module-level Map (process-wide)
  */
 interface RateLimitState {
 	windowStart: number;
 	count: number;
+	pendingPromise: Promise<void> | null;
 }
 
 /**
+ * Module-level storage for rate limit state (shared across all workflows)
+ * Key format: rateLimit:bunqApi:{credentialHash}:{method}
+ */
+const rateLimitState: Map<string, RateLimitState> = new Map();
+
+/**
  * Sleep utility function
+ * Uses a standard Promise with setTimeout, common in n8n nodes
  */
 function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 }
 
 /**
@@ -59,9 +70,16 @@ export async function enforceRateLimit(
 	// Get credentials to use as part of the rate limit key
 	const creds = await ctx.getCredentials('bunqApi');
 
-	if (!creds?.id) {
-		throw new Error('Missing credential ID for rate limit enforcement');
+	if (!creds?.apiKey) {
+		throw new Error('Missing API key in credentials for rate limit enforcement');
 	}
+
+	// Create a stable hash of the API key to use as credential identifier
+	// This ensures rate limits are enforced per credential across all workflows
+	const credentialHash = createHash('sha256')
+		.update(creds.apiKey as string)
+		.digest('hex')
+		.substring(0, 16);
 
 	// Determine which rate limit to apply
 	// Extract the path for accurate endpoint detection (handle both relative and absolute URLs)
@@ -81,7 +99,7 @@ export async function enforceRateLimit(
 	if (isSessionServer) {
 		// Special rate limit for session-server endpoint
 		rateLimit = RATE_LIMITS.SESSION_SERVER;
-		key = `rateLimit:bunqApi:${creds.id}:session-server`;
+		key = `rateLimit:bunqApi:${credentialHash}:session-server`;
 	} else {
 		// Per-method rate limits
 		const upperMethod = method.toUpperCase();
@@ -99,24 +117,20 @@ export async function enforceRateLimit(
 				// No rate limit for other methods (DELETE, PATCH, etc.)
 				return;
 		}
-		key = `rateLimit:bunqApi:${creds.id}:${upperMethod}`;
+		key = `rateLimit:bunqApi:${credentialHash}:${upperMethod}`;
 	}
 
-	// Get or initialize rate limit state from workflow static data
-	// Use 'global' scope so rate limits are enforced per credential across all workflows.
-	// This is correct because Bunq API rate limits apply to the credential/API key,
-	// not to individual workflows or nodes.
-	// Note: This implementation does not use locks/mutexes for simplicity. In n8n's typical
-	// usage patterns (sequential workflow execution), race conditions are rare and acceptable.
-	// For high-concurrency scenarios, consider adding a queuing mechanism.
-	const staticData = ctx.getWorkflowStaticData('global');
+	// Get or initialize rate limit state from module-level Map
+	// This is process-wide storage that ensures rate limits are enforced across all workflows
+	// for the same credential, as required by Bunq API's per-API-key limits.
 	const now = Date.now();
 
-	if (!staticData[key]) {
-		staticData[key] = {
+	if (!rateLimitState.has(key)) {
+		rateLimitState.set(key, {
 			windowStart: now,
 			count: 0,
-		} as RateLimitState;
+			pendingPromise: null,
+		});
 		ctx.logger.debug(`Rate limit window started for ${key}`, {
 			windowStart: now,
 			maxRequests: rateLimit.maxRequests,
@@ -124,7 +138,12 @@ export async function enforceRateLimit(
 		});
 	}
 
-	const state = staticData[key] as RateLimitState;
+	const state = rateLimitState.get(key)!;
+
+	// If there's already a pending wait, chain after it to serialize requests
+	if (state.pendingPromise) {
+		await state.pendingPromise;
+	}
 
 	// Reset window if expired
 	if (now - state.windowStart >= rateLimit.windowMs) {
@@ -147,7 +166,11 @@ export async function enforceRateLimit(
 				maxRequests: rateLimit.maxRequests,
 				waitMs,
 			});
-			await sleep(waitMs);
+			// Create a promise for this wait and store it so other requests can chain
+			const waitPromise = sleep(waitMs);
+			state.pendingPromise = waitPromise;
+			await waitPromise;
+			state.pendingPromise = null;
 		}
 
 		// Start new window after sleeping (use current time to account for any delays)
