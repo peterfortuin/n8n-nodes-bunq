@@ -37,7 +37,8 @@
             "dist/nodes/BunqSession/BunqSession.node.js",
             "dist/nodes/SignRequest/SignRequest.node.js",
             "dist/nodes/BunqTrigger/BunqTrigger.node.js",
-            "dist/nodes/MonetaryAccounts/MonetaryAccounts.node.js"
+            "dist/nodes/MonetaryAccounts/MonetaryAccounts.node.js",
+            "dist/nodes/Payments/Payments.node.js"
         ]
     },
     "devDependencies": {
