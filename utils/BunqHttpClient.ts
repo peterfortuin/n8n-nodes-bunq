@@ -6,6 +6,7 @@ import {
 } from 'n8n-workflow';
 import { randomUUID } from 'crypto';
 import { signData, getBunqBaseUrl } from './bunqApiHelpers';
+import { enforceRateLimit } from './rateLimit';
 
 // Import package version for User-Agent header
 import packageJson from '../package.json';
@@ -176,6 +177,9 @@ export class BunqHttpClient {
 			additionalHeaders = {},
 		} = options;
 
+		// Enforce rate limiting before making the request
+		await enforceRateLimit(this.context, method, url);
+
 		// Generate request ID for tracking
 		const requestId = randomUUID();
 
@@ -217,6 +221,11 @@ export class BunqHttpClient {
 		if (body) {
 			httpRequestOptions.body = body;
 		}
+
+		this.context.logger.debug('Making Bunq API request', {
+			method,
+			url: fullUrl,
+		});
 
 		try {
 			// Make the HTTP request
