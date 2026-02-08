@@ -69,7 +69,7 @@ export class Payments implements INodeType {
             name: 'itemsPerPage',
             type: 'number',
             default: 50,
-            description: 'Number of items to retrieve per page (max 200)',
+            description: 'Number of items to retrieve per page from the Bunq API (max 200)',
             typeOptions: {
               minValue: 1,
               maxValue: 200,
@@ -81,135 +81,143 @@ export class Payments implements INodeType {
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    try {
-      // Get node parameters
-      const monetaryAccountId = this.getNodeParameter('monetaryAccountId', 0) as number;
-      const additionalOptions = this.getNodeParameter('additionalOptions', 0, {}) as {
-        limit?: number;
-        lastDays?: number;
-        itemsPerPage?: number;
-      };
+    // Process each input item
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+      try {
+        // Get node parameters
+        const monetaryAccountId = this.getNodeParameter('monetaryAccountId', itemIndex) as number;
+        const additionalOptions = this.getNodeParameter('additionalOptions', itemIndex, {}) as {
+          limit?: number;
+          lastDays?: number;
+          itemsPerPage?: number;
+        };
 
-      // If limit is not provided or is 0, we return all results
-      const limit = additionalOptions.limit || 0;
-      const returnAll = limit === 0;
+        // If limit is not provided or is 0, we return all results
+        const limit = additionalOptions.limit || 0;
+        const returnAll = limit === 0;
 
-      // Ensure we have a valid Bunq session
-      const sessionData = await ensureBunqSession.call(this, false);
-      
-      if (!sessionData.sessionToken || !sessionData.userId) {
-        throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
-      }
+        // Ensure we have a valid Bunq session
+        const sessionData = await ensureBunqSession.call(this, false);
+        
+        if (!sessionData.sessionToken || !sessionData.userId) {
+          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
+        }
 
-      // Create HTTP client
-      const client = new BunqHttpClient(this);
+        // Create HTTP client
+        const client = new BunqHttpClient(this);
 
-      // Calculate date filter if specified
-      let dateFilter: Date | null = null;
-      if (additionalOptions.lastDays) {
-        dateFilter = new Date();
-        dateFilter.setDate(dateFilter.getDate() - additionalOptions.lastDays);
-      }
+        // Calculate date filter if specified
+        let dateFilter: Date | null = null;
+        if (additionalOptions.lastDays) {
+          dateFilter = new Date();
+          dateFilter.setDate(dateFilter.getDate() - additionalOptions.lastDays);
+        }
 
-      // Set up pagination parameters
-      const itemsPerPage = additionalOptions.itemsPerPage || 50;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let allPayments: any[] = [];
-      let nextUrl: string | null = `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment?count=${itemsPerPage}`;
-      let shouldContinue = true;
+        // Set up pagination parameters
+        const itemsPerPage = additionalOptions.itemsPerPage || 50;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let allPayments: any[] = [];
+        let nextUrl: string | null = `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment?count=${itemsPerPage}`;
+        let shouldContinue = true;
 
-      // Fetch payments with pagination
-      while (shouldContinue && nextUrl) {
-        const response = await client.request({
-          method: 'GET',
-          url: nextUrl,
-          sessionToken: sessionData.sessionToken,
-        });
+        // Fetch payments with pagination
+        while (shouldContinue && nextUrl) {
+          const response = await client.request({
+            method: 'GET',
+            url: nextUrl,
+            sessionToken: sessionData.sessionToken,
+          });
 
-        // Extract payments from response
-        if (response.Response && Array.isArray(response.Response)) {
-          for (const item of response.Response) {
-            // Each item is an object with 'Payment' as the key
-            if (item.Payment) {
-              const payment = item.Payment;
-              
-              // Apply date filter if specified
-              if (dateFilter) {
-                const paymentDate = new Date(payment.created);
-                if (paymentDate < dateFilter) {
-                  // Payments are returned in reverse chronological order (newest first)
-                  // If we hit a payment older than our filter, we can stop fetching
+          // Extract payments from response
+          if (response.Response && Array.isArray(response.Response)) {
+            for (const item of response.Response) {
+              // Each item is an object with 'Payment' as the key
+              if (item.Payment) {
+                const payment = item.Payment;
+                
+                // Apply date filter if specified
+                if (dateFilter) {
+                  const paymentDate = new Date(payment.created);
+                  if (paymentDate < dateFilter) {
+                    // Payments are returned in reverse chronological order (newest first)
+                    // If we hit a payment older than our filter, we can stop fetching
+                    shouldContinue = false;
+                    break;
+                  }
+                }
+                
+                allPayments.push(payment);
+
+                // Check if we've reached the limit (if not returning all)
+                if (!returnAll && allPayments.length >= limit) {
                   shouldContinue = false;
                   break;
                 }
               }
-              
-              allPayments.push(payment);
-
-              // Check if we've reached the limit (if not returning all)
-              if (!returnAll && allPayments.length >= limit) {
-                shouldContinue = false;
-                break;
-              }
             }
+          }
+
+          // Get the next page URL from pagination
+          if (shouldContinue && response.Pagination && response.Pagination.older_url) {
+            // The older_url from Bunq API includes /v1/ prefix, but our baseUrl already has it
+            // So we need to strip the /v1 prefix to avoid /v1/v1/ in the final URL
+            let paginationUrl = response.Pagination.older_url;
+            if (paginationUrl.startsWith('/v1/')) {
+              paginationUrl = paginationUrl.substring(3); // Remove '/v1' prefix
+            }
+            nextUrl = paginationUrl;
+          } else {
+            shouldContinue = false;
           }
         }
 
-        // Get the next page URL from pagination
-        if (shouldContinue && response.Pagination && response.Pagination.older_url) {
-          nextUrl = response.Pagination.older_url;
-        } else {
-          shouldContinue = false;
+        // Apply limit if not returning all
+        if (!returnAll && allPayments.length > limit) {
+          allPayments = allPayments.slice(0, limit);
         }
-      }
 
-      // Apply limit if not returning all
-      if (!returnAll && allPayments.length > limit) {
-        allPayments = allPayments.slice(0, limit);
-      }
+        // Return each payment as a separate n8n item
+        for (const payment of allPayments) {
+          returnData.push({
+            json: payment,
+            pairedItem: {
+              item: itemIndex,
+            },
+          });
+        }
 
-      // Return each payment as a separate n8n item
-      for (const payment of allPayments) {
-        returnData.push({
-          json: payment,
-        });
-      }
-
-      // If no payments were found, return a message
-      if (returnData.length === 0) {
-        const items = this.getInputData();
-        for (let i = 0; i < items.length; i++) {
+        // If no payments were found for this item, return a message
+        if (allPayments.length === 0) {
           returnData.push({
             json: {
               message: 'No payments found for the specified monetary account',
               monetaryAccountId,
             },
             pairedItem: {
-              item: i,
+              item: itemIndex,
             },
           });
         }
-      }
 
-      return this.prepareOutputData(returnData);
-
-    } catch (error) {
-      if (this.continueOnFail()) {
-        const items = this.getInputData();
-        // Return error data for all items if continueOnFail is enabled
-        const returnData: INodeExecutionData[] = items.map((_, i) => ({
-          json: {
-            error: error.message,
-          },
-          pairedItem: {
-            item: i,
-          },
-        }));
-        return this.prepareOutputData(returnData);
+      } catch (error) {
+        if (this.continueOnFail()) {
+          returnData.push({
+            json: {
+              error: error.message,
+            },
+            pairedItem: {
+              item: itemIndex,
+            },
+          });
+        } else {
+          throw error;
+        }
       }
-      throw error;
     }
+
+    return this.prepareOutputData(returnData);
   }
 }
