@@ -222,6 +222,11 @@ export class BunqHttpClient {
 			httpRequestOptions.body = body;
 		}
 
+		this.context.logger.debug('Making Bunq API request', {
+			method,
+			url: fullUrl,
+		});
+
 		try {
 			// Make the HTTP request
 			const response = await this.context.helpers.httpRequest(httpRequestOptions);
