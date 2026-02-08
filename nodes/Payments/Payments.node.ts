@@ -36,7 +36,7 @@ export class Payments implements INodeType {
         displayName: 'Monetary Account ID',
         name: 'monetaryAccountId',
         type: 'number',
-        default: '',
+        default: 0,
         required: true,
         description: 'The ID of the monetary account to retrieve payments from',
       },
@@ -51,9 +51,9 @@ export class Payments implements INodeType {
         displayName: 'Limit',
         name: 'limit',
         type: 'number',
-								typeOptions: {
-									minValue: 1,
-								},
+        typeOptions: {
+          minValue: 1,
+        },
         default: 50,
         description: 'Max number of results to return',
         displayOptions: {
