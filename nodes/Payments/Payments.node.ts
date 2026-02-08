@@ -69,7 +69,7 @@ export class Payments implements INodeType {
             name: 'itemsPerPage',
             type: 'number',
             default: 50,
-            description: 'Number of items to retrieve per page from the Bunq API (max 200)',
+            description: 'Number of items to retrieve per page from the bunq API (max 200)',
             typeOptions: {
               minValue: 1,
               maxValue: 200,
@@ -162,11 +162,11 @@ export class Payments implements INodeType {
 
           // Get the next page URL from pagination
           if (shouldContinue && response.Pagination && response.Pagination.older_url) {
-            // The older_url from Bunq API includes /v1/ prefix, but our baseUrl already has it
-            // So we need to strip the /v1 prefix to avoid /v1/v1/ in the final URL
+            // The older_url from bunq API includes /v1/ prefix, but our baseUrl already has it
+            // Strip the /v1 prefix (keeping the leading slash) to avoid /v1/v1/ in the final URL
             let paginationUrl = response.Pagination.older_url;
             if (paginationUrl.startsWith('/v1/')) {
-              paginationUrl = paginationUrl.substring(3); // Remove '/v1' prefix
+              paginationUrl = paginationUrl.substring(3); // Remove '/v1' keeping the '/'
             }
             nextUrl = paginationUrl;
           } else {
