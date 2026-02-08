@@ -41,34 +41,22 @@ export class Payments implements INodeType {
         description: 'The ID of the monetary account to retrieve payments from',
       },
       {
-        displayName: 'Return All',
-        name: 'returnAll',
-        type: 'boolean',
-        default: false,
-        description: 'Whether to return all results or only up to a given limit',
-      },
-      {
-        displayName: 'Limit',
-        name: 'limit',
-        type: 'number',
-        typeOptions: {
-          minValue: 1,
-        },
-        default: 50,
-        description: 'Max number of results to return',
-        displayOptions: {
-          show: {
-            returnAll: [false],
-          },
-        },
-      },
-      {
         displayName: 'Additional Options',
         name: 'additionalOptions',
         type: 'collection',
         placeholder: 'Add Option',
         default: {},
         options: [
+          {
+            displayName: 'Limit',
+            name: 'limit',
+            type: 'number',
+            typeOptions: {
+              minValue: 1,
+            },
+            default: 50,
+            description: 'Max number of results to return',
+          },
           {
             displayName: 'Last X Days',
             name: 'lastDays',
@@ -98,12 +86,15 @@ export class Payments implements INodeType {
     try {
       // Get node parameters
       const monetaryAccountId = this.getNodeParameter('monetaryAccountId', 0) as number;
-      const returnAll = this.getNodeParameter('returnAll', 0) as boolean;
-      const limit = this.getNodeParameter('limit', 0, 50) as number;
       const additionalOptions = this.getNodeParameter('additionalOptions', 0, {}) as {
+        limit?: number;
         lastDays?: number;
         itemsPerPage?: number;
       };
+
+      // If limit is not provided or is 0, we return all results
+      const limit = additionalOptions.limit || 0;
+      const returnAll = limit === 0;
 
       // Ensure we have a valid Bunq session
       const sessionData = await ensureBunqSession.call(this, false);

@@ -47,10 +47,9 @@ A node that retrieves payments from a specific Monetary Account in the Bunq API 
 
 **Parameters:**
 - **Monetary Account ID**: The ID of the account to retrieve payments from
-- **Return All**: Whether to fetch all payments or only a limited number
-- **Limit**: Maximum number of payments to return (when Return All is false)
-- **Last X Days**: Optional filter to only return payments from the last X days
-- **Items Per Page**: Number of items to fetch per API request (max 200)
+- **Limit** (optional): Maximum number of payments to return. If not specified, all payments are returned.
+- **Last X Days** (optional): Filter to only return payments from the last X days
+- **Items Per Page** (optional): Number of items to fetch per API request (max 200)
 
 ### Bunq Trigger
 A trigger node that starts your workflow when Bunq sends a webhook notification. The trigger automatically registers and manages webhooks with the Bunq API.
