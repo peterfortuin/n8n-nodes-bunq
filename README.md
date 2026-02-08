@@ -34,6 +34,23 @@ A node that retrieves a list of Monetary Accounts from the Bunq API with type fi
 - **Savings**: Regular or auto-savings accounts (including VAT accounts)
 - **Joint**: Shared accounts with other bunq users (legal co-owners)
 
+### Bunq Payments
+A node that retrieves payments from a specific Monetary Account in the Bunq API with support for pagination and date filtering.
+
+**Features:**
+- Fetch payments for any monetary account by ID
+- Full pagination support for large datasets
+- Date filtering to retrieve payments from the last X days
+- Option to return all results or limit to a specific number
+- Configurable page size (up to 200 items per page)
+- Returns each payment as a separate n8n item
+
+**Parameters:**
+- **Monetary Account ID**: The ID of the account to retrieve payments from
+- **Limit** (optional): Maximum number of payments to return. If not specified, all payments are returned.
+- **Last X Days** (optional): Filter to only return payments from the last X days
+- **Items Per Page** (optional): Number of items to fetch per API request (max 200)
+
 ### Bunq Trigger
 A trigger node that starts your workflow when Bunq sends a webhook notification. The trigger automatically registers and manages webhooks with the Bunq API.
 
@@ -168,3 +185,5 @@ The Sign Request node signs request bodies using your Bunq private key. This is 
 - Bunq Session node for session management
 - Sign Request node for request signing
 - Bunq Trigger node for webhook-based triggers with support for all Bunq callback categories
+- Bunq Monetary Accounts node for retrieving monetary accounts with type filtering
+- Bunq Payments node for retrieving payments with pagination and date filtering
