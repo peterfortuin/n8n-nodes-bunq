@@ -50,6 +50,7 @@ const rateLimitState: Map<string, RateLimitState> = new Map();
  */
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => {
+		// eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
 		setTimeout(resolve, ms);
 	});
 }
