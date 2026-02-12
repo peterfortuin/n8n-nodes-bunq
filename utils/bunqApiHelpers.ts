@@ -137,14 +137,14 @@ export async function registerDevice(
  * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param installationToken - Token from installation step
  * @param apiKey - The Bunq API key
- * @returns Session token and user ID
+ * @returns Session token, user ID, and session timeout (in seconds)
  */
 export async function createSession(
   this: BunqApiContext,
   baseUrl: string,
   installationToken: string,
   apiKey: string
-): Promise<{ token: string; userId: string }> {
+): Promise<{ token: string; userId: string; sessionTimeout: number }> {
   const payload = JSON.stringify({ secret: apiKey });
 
   const client = new BunqHttpClient(this);
@@ -155,10 +155,11 @@ export async function createSession(
     sessionToken: installationToken,
   });
 
-  // Extract token and user ID from response
+  // Extract token, user ID, and session timeout from response
   const responseData = response.Response;
   let token = '';
   let userId = '';
+  let sessionTimeout = 604800; // Default to 7 days (in seconds) if not provided
 
   for (const item of responseData) {
     if (item.Token) {
@@ -166,10 +167,19 @@ export async function createSession(
     }
     if (item.UserPerson) {
       userId = item.UserPerson.id.toString();
+      if (item.UserPerson.session_timeout) {
+        sessionTimeout = item.UserPerson.session_timeout;
+      }
     } else if (item.UserCompany) {
       userId = item.UserCompany.id.toString();
+      if (item.UserCompany.session_timeout) {
+        sessionTimeout = item.UserCompany.session_timeout;
+      }
     } else if (item.UserApiKey) {
       userId = item.UserApiKey.id.toString();
+      if (item.UserApiKey.session_timeout) {
+        sessionTimeout = item.UserApiKey.session_timeout;
+      }
     }
   }
 
@@ -180,16 +190,20 @@ export async function createSession(
     });
   }
 
-  return { token, userId };
+  return { token, userId, sessionTimeout };
 }
 
 /**
- * Check if session is expired (older than 89 days)
+ * Check if session is expired based on user-configured session timeout
+ * @param createdAt - Timestamp when the session was created (in milliseconds)
+ * @param sessionTimeout - Session timeout from Bunq configuration (in seconds)
+ * @returns True if session is expired (exceeded 50% of maximum allowed time)
  */
-export function isSessionExpired(createdAt: number): boolean {
-  // Bunq sessions typically expire after 90 days, but can be extended
-  // We'll check if the session is older than 89 days (to be safe)
-  const maxAge = 89 * 24 * 60 * 60 * 1000; // 89 days in milliseconds
+export function isSessionExpired(createdAt: number, sessionTimeout?: number): boolean {
+  // Use 50% of the session timeout as safety margin
+  // Default to 7 days (604800 seconds) if sessionTimeout is not provided
+  const timeoutSeconds = sessionTimeout || 604800;
+  const maxAge = (timeoutSeconds * 0.5) * 1000; // Convert to milliseconds and apply 50% safety margin
   return (Date.now() - createdAt) > maxAge;
 }
 
@@ -202,6 +216,7 @@ export interface IBunqSessionData {
   deviceServerId?: string;
   sessionToken?: string;
   sessionCreatedAt?: number;
+  sessionTimeout?: number;
   userId?: string;
   environment?: string;
 }
@@ -259,7 +274,7 @@ export async function ensureBunqSession(
   // Step 3: Create session if needed or if expired
   const shouldCreateSession = !sessionData.sessionToken || 
     !sessionData.sessionCreatedAt ||
-    isSessionExpired(sessionData.sessionCreatedAt);
+    isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
 
   if (shouldCreateSession) {
     const sessionResult = await createSession.call(
@@ -271,6 +286,7 @@ export async function ensureBunqSession(
     sessionData.sessionToken = sessionResult.token;
     sessionData.sessionCreatedAt = Date.now();
     sessionData.userId = sessionResult.userId;
+    sessionData.sessionTimeout = sessionResult.sessionTimeout;
     workflowStaticData.bunqSession = sessionData;
   }
 
