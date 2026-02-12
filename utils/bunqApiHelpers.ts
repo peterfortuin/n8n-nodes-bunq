@@ -226,7 +226,8 @@ export async function ensureBunqSession(
   const baseUrl = getBunqBaseUrl(environment);
 
   // Get or initialize session data from workflow static data
-  const workflowStaticData = this.getWorkflowStaticData('node');
+  // Use 'global' scope to share session across all Bunq nodes in the workflow
+  const workflowStaticData = this.getWorkflowStaticData('global');
   let sessionData: IBunqSessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
 
   // If force recreate is true, clear all session data
