@@ -2,7 +2,8 @@ import {
   IExecuteFunctions,
   INodeType,
   INodeTypeDescription,
-  INodeExecutionData
+  INodeExecutionData,
+  ICredentialDataDecryptedObject,
 } from 'n8n-workflow';
 import { signData } from '../../utils/bunqApiHelpers';
 
@@ -51,7 +52,7 @@ export class SignRequest implements INodeType {
     const returnData: INodeExecutionData[] = [];
 
     // Load private key from credentials (support both API key and OAuth)
-    let credentials;
+    let credentials: ICredentialDataDecryptedObject;
     try {
       credentials = await this.getCredentials('bunqOAuth2Api');
     } catch {

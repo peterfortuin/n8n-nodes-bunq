@@ -251,7 +251,7 @@ async function ensureBunqSessionOAuth(
 
   // Get or initialize session data from workflow static data
   const workflowStaticData = this.getWorkflowStaticData('global');
-  let sessionData: IBunqSessionData = workflowStaticData.bunqSessionOAuth as IBunqSessionData || {};
+  let sessionData: IBunqSessionData = (workflowStaticData.bunqSessionOAuth as IBunqSessionData) || {};
 
   // If force recreate is true, clear session data
   if (forceRecreate) {
@@ -307,10 +307,12 @@ export async function ensureBunqSession(
 ): Promise<IBunqSessionData> {
   // Try to detect which credential type is being used
   try {
-    // Check if OAuth2 credentials are available
+    // Check if OAuth2 credentials are available and valid
     const oauthCredentials = await this.getCredentials('bunqOAuth2Api');
-    if (oauthCredentials) {
-      // Use OAuth flow
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const oauthData = (oauthCredentials.oauthTokenData as any);
+    // Only use OAuth flow if we have a valid access token
+    if (oauthCredentials && oauthData?.access_token) {
       return await ensureBunqSessionOAuth.call(this, forceRecreate);
     }
   } catch {
