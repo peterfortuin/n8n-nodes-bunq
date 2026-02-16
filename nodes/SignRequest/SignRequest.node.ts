@@ -24,7 +24,11 @@ export class SignRequest implements INodeType {
     credentials: [
       {
         name: 'bunqApi',
-        required: true,
+        required: false,
+      },
+      {
+        name: 'bunqOAuth2Api',
+        required: false,
       },
     ],
     properties: [
@@ -46,8 +50,13 @@ export class SignRequest implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    // Load private key from bunqApi credential
-    const credentials = await this.getCredentials('bunqApi');
+    // Load private key from credentials (support both API key and OAuth)
+    let credentials;
+    try {
+      credentials = await this.getCredentials('bunqOAuth2Api');
+    } catch {
+      credentials = await this.getCredentials('bunqApi');
+    }
     const privateKey = credentials.privateKey as string;
 
     for (let i = 0; i < items.length; i++) {

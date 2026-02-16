@@ -222,7 +222,80 @@ export interface IBunqSessionData {
 }
 
 /**
+ * Ensures a valid Bunq session exists or creates one if needed (OAuth flow).
+ * For OAuth, we only need to create a session using the access token - no installation or device registration.
+ * @param this - The Bunq API context (IExecuteFunctions or IHookFunctions)
+ * @param forceRecreate - If true, forces recreation of session data
+ * @returns Session data with session token and user ID
+ */
+async function ensureBunqSessionOAuth(
+  this: BunqApiContext,
+  forceRecreate: boolean = false
+): Promise<IBunqSessionData> {
+  // Retrieve OAuth credentials from context
+  const credentials = await this.getCredentials('bunqOAuth2Api');
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const oauthData = credentials.oauthTokenData as any;
+  const accessToken = oauthData?.access_token as string;
+  const publicKey = credentials.publicKey as string;
+  const environment = credentials.environment as string;
+  const baseUrl = getBunqBaseUrl(environment);
+
+  if (!accessToken) {
+    throw new NodeApiError(this.getNode(), {
+      message: 'OAuth access token not found',
+      description: 'Please reconnect your Bunq OAuth2 credentials',
+    });
+  }
+
+  // Get or initialize session data from workflow static data
+  const workflowStaticData = this.getWorkflowStaticData('global');
+  let sessionData: IBunqSessionData = workflowStaticData.bunqSessionOAuth as IBunqSessionData || {};
+
+  // If force recreate is true, clear session data
+  if (forceRecreate) {
+    sessionData = {};
+    workflowStaticData.bunqSessionOAuth = sessionData;
+  }
+
+  // For OAuth, we still need installation for request signing
+  if (!sessionData.installationToken || !sessionData.serverPublicKey) {
+    const installationResult = await createInstallation.call(this, baseUrl, publicKey);
+    sessionData.installationToken = installationResult.token;
+    sessionData.serverPublicKey = installationResult.serverPublicKey;
+    workflowStaticData.bunqSessionOAuth = sessionData;
+  }
+
+  // Create session if needed or if expired
+  const shouldCreateSession = !sessionData.sessionToken || 
+    !sessionData.sessionCreatedAt ||
+    isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
+
+  if (shouldCreateSession) {
+    // Use the OAuth access token like an API key to create a session
+    const sessionResult = await createSession.call(
+      this,
+      baseUrl,
+      sessionData.installationToken!,
+      accessToken
+    );
+    sessionData.sessionToken = sessionResult.token;
+    sessionData.sessionCreatedAt = Date.now();
+    sessionData.userId = sessionResult.userId;
+    sessionData.sessionTimeout = sessionResult.sessionTimeout;
+    workflowStaticData.bunqSessionOAuth = sessionData;
+  }
+
+  // Always include environment in returned session data
+  sessionData.environment = environment;
+  
+  return sessionData;
+}
+
+/**
  * Ensures a valid Bunq session exists or creates one if needed.
+ * Automatically detects whether to use API Key or OAuth authentication.
  * Manages the complete session lifecycle including installation, device registration, and session creation.
  * @param this - The Bunq API context (IExecuteFunctions or IHookFunctions)
  * @param forceRecreate - If true, forces recreation of all session data
@@ -232,7 +305,19 @@ export async function ensureBunqSession(
   this: BunqApiContext,
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
-  // Retrieve credentials from context
+  // Try to detect which credential type is being used
+  try {
+    // Check if OAuth2 credentials are available
+    const oauthCredentials = await this.getCredentials('bunqOAuth2Api');
+    if (oauthCredentials) {
+      // Use OAuth flow
+      return await ensureBunqSessionOAuth.call(this, forceRecreate);
+    }
+  } catch {
+    // OAuth credentials not available, continue to API Key flow
+  }
+
+  // Use API Key flow (existing implementation)
   const credentials = await this.getCredentials('bunqApi');
   
   const apiKey = credentials.apiKey as string;

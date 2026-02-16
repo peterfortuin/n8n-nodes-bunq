@@ -36,7 +36,11 @@ export class BunqTrigger implements INodeType {
 		credentials: [
 			{
 				name: 'bunqApi',
-				required: true,
+				required: false,
+			},
+			{
+				name: 'bunqOAuth2Api',
+				required: false,
 			},
 		],
 		webhooks: [

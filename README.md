@@ -87,14 +87,19 @@ A utility node that signs request bodies using RSA-SHA256 with your Bunq private
 
 ## Credentials
 
-To use these nodes, you need to set up Bunq API credentials in n8n:
+To use these nodes, you need to set up Bunq API credentials in n8n. You can choose between two authentication methods:
 
-### Prerequisites
+### Authentication Methods
+
+#### Option 1: API Key Authentication (Recommended for personal use)
+Best for: Personal projects, server-to-server communication, and automated scripts.
+
+**Prerequisites:**
 1. A Bunq account (production or sandbox)
 2. An API key from your Bunq account
 3. An RSA key pair (private and public keys in PEM format)
 
-### Setting up credentials in n8n
+**Setting up API Key credentials:**
 
 1. In n8n, go to **Credentials** → **New**
 2. Search for "Bunq API" and select it
@@ -105,7 +110,41 @@ To use these nodes, you need to set up Bunq API credentials in n8n:
    - **Public Key (PEM)**: Your RSA public key in PEM format
 4. Click **Save**
 
-### Getting your API Key
+#### Option 2: OAuth2 Authentication (Required for public applications)
+Best for: Third-party applications that need user-specific access with fine-grained permissions.
+
+**Prerequisites:**
+1. A Bunq account (production or sandbox)
+2. OAuth client credentials (Client ID and Client Secret) from Bunq Developer portal
+3. An RSA key pair (private and public keys in PEM format)
+
+**Setting up OAuth2 credentials:**
+
+1. **Create an OAuth client in Bunq:**
+   - Log in to your Bunq app
+   - Go to Profile → Security & Settings → Developers → OAuth
+   - Create a new OAuth client and note down the redirect URL provided by n8n (you'll see this in step 3)
+   
+2. In n8n, go to **Credentials** → **New**
+
+3. Search for "Bunq OAuth2 API" and select it
+
+4. Fill in the following fields:
+   - **Environment**: Choose "Sandbox" for testing or "Production" for live transactions
+   - **Client ID**: Your OAuth Client ID from Bunq Developer portal
+   - **Client Secret**: Your OAuth Client Secret from Bunq Developer portal
+   - **Private Key (PEM)**: Your RSA private key in PEM format
+   - **Public Key (PEM)**: Your RSA public key in PEM format
+
+5. Copy the **OAuth Callback URL** shown in the credential form
+
+6. Go back to your Bunq OAuth client settings and add this callback URL as a redirect URL
+
+7. Click **Connect my account** to authorize n8n to access your Bunq account
+
+8. Complete the authorization in the Bunq app when prompted
+
+### Getting your API Key (for API Key authentication)
 
 **Sandbox:**
 - Visit the [Bunq Sandbox](https://www.bunq.com/developer)
@@ -117,7 +156,20 @@ To use these nodes, you need to set up Bunq API credentials in n8n:
 - Go to Profile → Security & Settings → Developers
 - Generate an API key
 
-### Generating RSA Keys
+### Getting OAuth Credentials (for OAuth2 authentication)
+
+**Sandbox:**
+- Visit the [Bunq Developer Portal](https://developer.bunq.com)
+- Create a sandbox account
+- Create an OAuth client and retrieve your Client ID and Client Secret
+
+**Production:**
+- Log in to your Bunq app
+- Go to Profile → Security & Settings → Developers → OAuth
+- Create an OAuth client
+- Retrieve your Client ID and Client Secret
+
+### Generating RSA Keys (required for both methods)
 
 You can generate an RSA key pair using OpenSSL:
 

@@ -26,7 +26,11 @@ export class BunqSession implements INodeType {
     credentials: [
       {
         name: 'bunqApi',
-        required: true,
+        required: false,
+      },
+      {
+        name: 'bunqOAuth2Api',
+        required: false,
       },
     ],
     properties: [
