@@ -51,7 +51,7 @@ export class BunqOAuth2Api implements ICredentialType {
       displayName: 'Access Token URL',
       name: 'accessTokenUrl',
       type: 'hidden',
-      default: '={{$self.environment === "sandbox" ? "https://api-oauth.sandbox.bunq.com/v1/token" : "https://api-oauth.bunq.com/v1/token"}}',
+      default: '={{$self.environment === "sandbox" ? "https://oauth.sandbox.bunq.com/token" : "https://oauth.bunq.com/token"}}',
       required: true,
     },
     {
@@ -70,7 +70,7 @@ export class BunqOAuth2Api implements ICredentialType {
       displayName: 'Authentication',
       name: 'authentication',
       type: 'hidden',
-      default: 'header',
+      default: 'body',
     },
     {
       displayName: 'Private Key (PEM)',
