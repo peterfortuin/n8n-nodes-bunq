@@ -7,9 +7,15 @@ import {
 
 export class BunqApi implements ICredentialType {
   name = 'bunqApi';
-  displayName = 'Bunq API';
+  displayName = 'Bunq API Key API';
   documentationUrl = 'https://doc.bunq.com';
   icon: Icon = 'file:../assets/Bunq-logo.svg';
+  httpRequestNode = {
+    name: 'Bunq API Key',
+    docsUrl: 'https://doc.bunq.com',
+    hidden: true,
+    apiBaseUrlPlaceholder: 'https://api.bunq.com/v1',
+  };
   test: ICredentialTestRequest = {
     request: {
       baseURL: '={{$credentials.environment === "sandbox" ? "https://public-api.sandbox.bunq.com/v1" : "https://api.bunq.com/v1"}}',

@@ -10,6 +10,12 @@ export class BunqOAuth2Api implements ICredentialType {
   displayName = 'Bunq OAuth2 API';
   documentationUrl = 'https://doc.bunq.com/basics/authentication/oauth';
   icon: Icon = 'file:../assets/Bunq-logo.svg';
+  httpRequestNode = {
+    name: 'Bunq OAuth2 API',
+    docsUrl: 'https://doc.bunq.com/basics/authentication/oauth',
+    hidden: true,
+    apiBaseUrlPlaceholder: 'https://api.bunq.com/v1',
+  };
   properties: INodeProperties[] = [
     {
       displayName: 'Grant Type',

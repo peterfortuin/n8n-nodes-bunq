@@ -223,7 +223,8 @@ export interface IBunqSessionData {
 
 /**
  * Ensures a valid Bunq session exists or creates one if needed (OAuth flow).
- * For OAuth, we only need to create a session using the access token - no installation or device registration.
+ * For OAuth, we still need installation (for request signing) but skip device registration.
+ * The OAuth access token is used like an API key to create the session.
  * @param this - The Bunq API context (IExecuteFunctions or IHookFunctions)
  * @param forceRecreate - If true, forces recreation of session data
  * @returns Session data with session token and user ID
