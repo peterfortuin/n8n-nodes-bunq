@@ -16,7 +16,7 @@ export class SignRequest implements INodeType {
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
-    description: 'Signs a request body using a private key credential',
+    description: 'Signs a request body using a private key credential. Choose either API Key or OAuth2 credentials.',
     defaults: {
       name: 'Sign Request'
     },

@@ -27,7 +27,7 @@ export class BunqTrigger implements INodeType {
 		icon: 'file:../../assets/Bunq-logo.svg',
 		group: ['trigger'],
 		version: 1,
-		description: 'Starts the workflow when Bunq sends a webhook notification',
+		description: 'Starts the workflow when Bunq sends a webhook notification. Choose either API Key or OAuth2 credentials.',
 		defaults: {
 			name: 'Bunq Trigger',
 		},

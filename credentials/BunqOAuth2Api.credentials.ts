@@ -44,14 +44,14 @@ export class BunqOAuth2Api implements ICredentialType {
       displayName: 'Authorization URL',
       name: 'authUrl',
       type: 'hidden',
-      default: '={{$credentials.environment === "sandbox" ? "https://oauth.sandbox.bunq.com/auth" : "https://oauth.bunq.com/auth"}}',
+      default: '={{$self.environment === "sandbox" ? "https://oauth.sandbox.bunq.com/auth" : "https://oauth.bunq.com/auth"}}',
       required: true,
     },
     {
       displayName: 'Access Token URL',
       name: 'accessTokenUrl',
       type: 'hidden',
-      default: '={{$credentials.environment === "sandbox" ? "https://api-oauth.sandbox.bunq.com/v1/token" : "https://api-oauth.bunq.com/v1/token"}}',
+      default: '={{$self.environment === "sandbox" ? "https://api-oauth.sandbox.bunq.com/v1/token" : "https://api-oauth.bunq.com/v1/token"}}',
       required: true,
     },
     {

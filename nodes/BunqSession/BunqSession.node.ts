@@ -17,7 +17,7 @@ export class BunqSession implements INodeType {
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
-    description: 'Create and manage Bunq API session (installation, device registration, session creation)',
+    description: 'Create and manage Bunq API session (installation, device registration, session creation). Choose either API Key or OAuth2 credentials.',
     defaults: {
       name: 'Bunq Session'
     },
