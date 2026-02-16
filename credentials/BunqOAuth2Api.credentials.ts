@@ -70,7 +70,7 @@ export class BunqOAuth2Api implements ICredentialType {
       displayName: 'Authentication',
       name: 'authentication',
       type: 'hidden',
-      default: 'body',
+      default: 'header',
     },
     {
       displayName: 'Private Key (PEM)',
