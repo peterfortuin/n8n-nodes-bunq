@@ -2,11 +2,11 @@ import {
   ICredentialType,
   INodeProperties,
   Icon,
+  ICredentialTestRequest,
 } from 'n8n-workflow';
 
 export class BunqOAuth2Api implements ICredentialType {
   name = 'bunqOAuth2Api';
-  extends = ['oAuth2Api'];
   displayName = 'Bunq OAuth2 API';
   documentationUrl = 'https://doc.bunq.com/basics/authentication/oauth';
   icon: Icon = 'file:../assets/Bunq-logo.svg';
@@ -16,13 +16,14 @@ export class BunqOAuth2Api implements ICredentialType {
     hidden: true,
     apiBaseUrlPlaceholder: 'https://api.bunq.com/v1',
   };
-  properties: INodeProperties[] = [
-    {
-      displayName: 'Grant Type',
-      name: 'grantType',
-      type: 'hidden',
-      default: 'authorizationCode',
+  test: ICredentialTestRequest = {
+    request: {
+      baseURL: '={{$credentials.environment === "sandbox" ? "https://public-api.sandbox.bunq.com" : "https://api.bunq.com"}}',
+      url: '/v1/user',
+      method: 'GET',
     },
+  };
+  properties: INodeProperties[] = [
     {
       displayName: 'Environment',
       name: 'environment',
@@ -41,36 +42,15 @@ export class BunqOAuth2Api implements ICredentialType {
       description: 'The Bunq API environment to use',
     },
     {
-      displayName: 'Authorization URL',
-      name: 'authUrl',
-      type: 'hidden',
-      default: '={{$self.environment === "sandbox" ? "https://oauth.sandbox.bunq.com/auth" : "https://oauth.bunq.com/auth"}}',
-      required: true,
-    },
-    {
-      displayName: 'Access Token URL',
-      name: 'accessTokenUrl',
-      type: 'hidden',
-      default: '={{$self.environment === "sandbox" ? "https://api-oauth.sandbox.bunq.com/v1/token" : "https://api.oauth.bunq.com/v1/token"}}',
-      required: true,
-    },
-    {
-      displayName: 'Scope',
-      name: 'scope',
-      type: 'hidden',
+      displayName: 'OAuth Access Token',
+      name: 'accessToken',
+      type: 'string',
+      typeOptions: {
+        password: true,
+      },
       default: '',
-    },
-    {
-      displayName: 'Auth URI Query Parameters',
-      name: 'authQueryParameters',
-      type: 'hidden',
-      default: '',
-    },
-    {
-      displayName: 'Authentication',
-      name: 'authentication',
-      type: 'hidden',
-      default: 'body',
+      required: true,
+      description: 'OAuth Access Token obtained from Bunq. Follow the OAuth setup instructions in the documentation to obtain this token.',
     },
     {
       displayName: 'Private Key (PEM)',

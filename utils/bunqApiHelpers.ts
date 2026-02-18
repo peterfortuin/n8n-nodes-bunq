@@ -236,9 +236,8 @@ async function ensureBunqSessionOAuth(
   // Retrieve OAuth credentials from context
   const credentials = await this.getCredentials('bunqOAuth2Api');
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const oauthData = credentials.oauthTokenData as any;
-  const accessToken = oauthData?.access_token as string;
+  // Get the access token directly from credentials (manual OAuth)
+  const accessToken = credentials.accessToken as string;
   const publicKey = credentials.publicKey as string;
   const environment = credentials.environment as string;
   const baseUrl = getBunqBaseUrl(environment);
@@ -246,7 +245,7 @@ async function ensureBunqSessionOAuth(
   if (!accessToken) {
     throw new NodeApiError(this.getNode(), {
       message: 'OAuth access token not found',
-      description: 'Please reconnect your Bunq OAuth2 credentials',
+      description: 'Please provide a valid OAuth access token in your Bunq OAuth2 credentials',
     });
   }
 

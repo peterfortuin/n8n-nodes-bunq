@@ -115,7 +115,7 @@ Best for: Third-party applications that need user-specific access with fine-grai
 
 **Prerequisites:**
 1. A Bunq account (production or sandbox)
-2. OAuth client credentials (Client ID and Client Secret) from Bunq Developer portal
+2. OAuth client credentials from Bunq Developer portal
 3. An RSA key pair (private and public keys in PEM format)
 
 **Setting up OAuth2 credentials:**
@@ -123,26 +123,54 @@ Best for: Third-party applications that need user-specific access with fine-grai
 1. **Create an OAuth client in Bunq:**
    - Log in to your Bunq app
    - Go to Profile → Security & Settings → Developers → OAuth
-   - Create a new OAuth client and note down the redirect URL provided by n8n (you'll see this in step 3)
+   - Create a new OAuth client with a redirect URL (e.g., `https://your-domain.com/oauth/callback`)
+   - Note down your **Client ID** and **Client Secret**
    
-2. In n8n, go to **Credentials** → **New**
+2. **Obtain an OAuth Access Token:**
+   
+   The OAuth flow must be completed outside of n8n to obtain an access token. You have two options:
+   
+   **Option A: Use the Bunq mobile app** (Easiest)
+   - In the Bunq app, go to your OAuth client settings
+   - Use the QR code flow to authorize your application
+   - The access token will be returned to your redirect URL
+   
+   **Option B: Manual API call** (Advanced)
+   
+   a. Direct users to the authorization URL:
+   ```
+   https://oauth.bunq.com/auth?response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI&state=RANDOM_STATE
+   ```
+   (Use `https://oauth.sandbox.bunq.com/auth` for sandbox)
+   
+   b. After user authorization, Bunq redirects to your redirect_uri with a `code` parameter
+   
+   c. Exchange the authorization code for an access token with a POST request:
+   ```bash
+   curl -X POST https://api.oauth.bunq.com/v1/token \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "grant_type=authorization_code" \
+     -d "code=YOUR_AUTHORIZATION_CODE" \
+     -d "redirect_uri=YOUR_REDIRECT_URI" \
+     -d "client_id=YOUR_CLIENT_ID" \
+     -d "client_secret=YOUR_CLIENT_SECRET"
+   ```
+   (Use `https://api-oauth.sandbox.bunq.com/v1/token` for sandbox)
+   
+   d. The response will contain an `access_token` - save this token
+   
+3. **Configure credentials in n8n:**
+   
+   - In n8n, go to **Credentials** → **New**
+   - Search for "Bunq OAuth2 API" and select it
+   - Fill in the following fields:
+     - **Environment**: Choose "Sandbox" for testing or "Production" for live transactions
+     - **OAuth Access Token**: The access token you obtained in step 2
+     - **Private Key (PEM)**: Your RSA private key in PEM format
+     - **Public Key (PEM)**: Your RSA public key in PEM format
+   - Click **Save**
 
-3. Search for "Bunq OAuth2 API" and select it
-
-4. Fill in the following fields:
-   - **Environment**: Choose "Sandbox" for testing or "Production" for live transactions
-   - **Client ID**: Your OAuth Client ID from Bunq Developer portal
-   - **Client Secret**: Your OAuth Client Secret from Bunq Developer portal
-   - **Private Key (PEM)**: Your RSA private key in PEM format
-   - **Public Key (PEM)**: Your RSA public key in PEM format
-
-5. Copy the **OAuth Callback URL** shown in the credential form
-
-6. Go back to your Bunq OAuth client settings and add this callback URL as a redirect URL
-
-7. Click **Connect my account** to authorize n8n to access your Bunq account
-
-8. Complete the authorization in the Bunq app when prompted
+**Note:** OAuth access tokens from Bunq do not expire, but can be revoked by the user. If a token is revoked, you'll need to repeat the OAuth flow to obtain a new one.
 
 ### Getting your API Key (for API Key authentication)
 
