@@ -309,10 +309,8 @@ export async function ensureBunqSession(
   try {
     // Check if OAuth2 credentials are available and valid
     const oauthCredentials = await this.getCredentials('bunqOAuth2Api');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const oauthData = (oauthCredentials.oauthTokenData as any);
-    // Only use OAuth flow if we have a valid access token
-    if (oauthCredentials && oauthData?.access_token) {
+    // Only use OAuth flow if we have a valid access token (manual OAuth implementation)
+    if (oauthCredentials && oauthCredentials.accessToken) {
       return await ensureBunqSessionOAuth.call(this, forceRecreate);
     }
   } catch {
@@ -320,65 +318,73 @@ export async function ensureBunqSession(
   }
 
   // Use API Key flow (existing implementation)
-  const credentials = await this.getCredentials('bunqApi');
-  
-  const apiKey = credentials.apiKey as string;
-  const publicKey = credentials.publicKey as string;
-  const environment = credentials.environment as string;
-  const baseUrl = getBunqBaseUrl(environment);
+  try {
+    const credentials = await this.getCredentials('bunqApi');
+    
+    const apiKey = credentials.apiKey as string;
+    const publicKey = credentials.publicKey as string;
+    const environment = credentials.environment as string;
+    const baseUrl = getBunqBaseUrl(environment);
 
-  // Get or initialize session data from workflow static data
-  // Use 'global' scope to share session across all Bunq nodes in the workflow
-  const workflowStaticData = this.getWorkflowStaticData('global');
-  let sessionData: IBunqSessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
+    // Get or initialize session data from workflow static data
+    // Use 'global' scope to share session across all Bunq nodes in the workflow
+    const workflowStaticData = this.getWorkflowStaticData('global');
+    let sessionData: IBunqSessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
 
-  // If force recreate is true, clear all session data
-  if (forceRecreate) {
-    sessionData = {};
-    workflowStaticData.bunqSession = sessionData;
+    // If force recreate is true, clear all session data
+    if (forceRecreate) {
+      sessionData = {};
+      workflowStaticData.bunqSession = sessionData;
+    }
+
+    // Step 1: Create installation if needed
+    if (!sessionData.installationToken || !sessionData.serverPublicKey) {
+      const installationResult = await createInstallation.call(this, baseUrl, publicKey);
+      sessionData.installationToken = installationResult.token;
+      sessionData.serverPublicKey = installationResult.serverPublicKey;
+      workflowStaticData.bunqSession = sessionData;
+    }
+
+    // Step 2: Register device if needed
+    if (!sessionData.deviceServerId) {
+      const deviceId = await registerDevice.call(
+        this,
+        baseUrl,
+        sessionData.installationToken!,
+        apiKey
+      );
+      sessionData.deviceServerId = deviceId;
+      workflowStaticData.bunqSession = sessionData;
+    }
+
+    // Step 3: Create session if needed or if expired
+    const shouldCreateSession = !sessionData.sessionToken || 
+      !sessionData.sessionCreatedAt ||
+      isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
+
+    if (shouldCreateSession) {
+      const sessionResult = await createSession.call(
+        this,
+        baseUrl,
+        sessionData.installationToken!,
+        apiKey
+      );
+      sessionData.sessionToken = sessionResult.token;
+      sessionData.sessionCreatedAt = Date.now();
+      sessionData.userId = sessionResult.userId;
+      sessionData.sessionTimeout = sessionResult.sessionTimeout;
+      workflowStaticData.bunqSession = sessionData;
+    }
+
+    // Always include environment in returned session data
+    sessionData.environment = environment;
+    
+    return sessionData;
+  } catch {
+    // Neither credential type is available
+    throw new NodeApiError(this.getNode(), {
+      message: 'No valid Bunq credentials found',
+      description: 'Please configure either Bunq API Key API or Bunq OAuth2 API credentials for this node',
+    });
   }
-
-  // Step 1: Create installation if needed
-  if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-    const installationResult = await createInstallation.call(this, baseUrl, publicKey);
-    sessionData.installationToken = installationResult.token;
-    sessionData.serverPublicKey = installationResult.serverPublicKey;
-    workflowStaticData.bunqSession = sessionData;
-  }
-
-  // Step 2: Register device if needed
-  if (!sessionData.deviceServerId) {
-    const deviceId = await registerDevice.call(
-      this,
-      baseUrl,
-      sessionData.installationToken!,
-      apiKey
-    );
-    sessionData.deviceServerId = deviceId;
-    workflowStaticData.bunqSession = sessionData;
-  }
-
-  // Step 3: Create session if needed or if expired
-  const shouldCreateSession = !sessionData.sessionToken || 
-    !sessionData.sessionCreatedAt ||
-    isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
-
-  if (shouldCreateSession) {
-    const sessionResult = await createSession.call(
-      this,
-      baseUrl,
-      sessionData.installationToken!,
-      apiKey
-    );
-    sessionData.sessionToken = sessionResult.token;
-    sessionData.sessionCreatedAt = Date.now();
-    sessionData.userId = sessionResult.userId;
-    sessionData.sessionTimeout = sessionResult.sessionTimeout;
-    workflowStaticData.bunqSession = sessionData;
-  }
-
-  // Always include environment in returned session data
-  sessionData.environment = environment;
-  
-  return sessionData;
 }
