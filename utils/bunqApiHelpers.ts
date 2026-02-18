@@ -306,14 +306,25 @@ export async function ensureBunqSession(
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
   // Try to detect which credential type is being used
+  let oauthCredentialsConfigured = false;
   try {
     // Check if OAuth2 credentials are available and valid
     const oauthCredentials = await this.getCredentials('bunqOAuth2Api');
+    oauthCredentialsConfigured = true;
     // Only use OAuth flow if we have a valid access token (manual OAuth implementation)
     if (oauthCredentials && oauthCredentials.accessToken) {
       return await ensureBunqSessionOAuth.call(this, forceRecreate);
     }
-  } catch {
+    // OAuth credentials are configured but access token is missing
+    throw new NodeApiError(this.getNode(), {
+      message: 'OAuth access token is required',
+      description: 'Please provide a valid OAuth access token in your Bunq OAuth2 API credentials. See the README for instructions on how to obtain an access token.',
+    });
+  } catch (error) {
+    // If OAuth credentials are configured but there was an error, re-throw it
+    if (oauthCredentialsConfigured) {
+      throw error;
+    }
     // OAuth credentials not available, continue to API Key flow
   }
 
