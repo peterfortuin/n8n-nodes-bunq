@@ -51,7 +51,7 @@ export class BunqHttpClient {
 	/**
 	 * Initialize the client by retrieving credentials and setting up environment
 	 * This must be called before making any requests
-	 * Supports both bunqApi and bunqOAuth2Api credentials
+	 * Uses bunqOAuth2Api credentials
 	 */
 	private async initialize(): Promise<void> {
 		if (this.environment) {
@@ -59,21 +59,8 @@ export class BunqHttpClient {
 			return;
 		}
 		
-		// Try OAuth credentials first
-		try {
-			const credentials = await this.context.getCredentials('bunqOAuth2Api');
-			if (credentials) {
-				this.environment = credentials.environment as string;
-				this.baseUrl = getBunqBaseUrl(this.environment);
-				this.privateKey = credentials.privateKey as string;
-				return;
-			}
-		} catch {
-			// OAuth credentials not available, try API Key credentials
-		}
-
-		// Fall back to API Key credentials
-		const credentials = await this.context.getCredentials('bunqApi');
+		// Get OAuth2 credentials
+		const credentials = await this.context.getCredentials('bunqOAuth2Api');
 		this.environment = credentials.environment as string;
 		this.baseUrl = getBunqBaseUrl(this.environment);
 		this.privateKey = credentials.privateKey as string;

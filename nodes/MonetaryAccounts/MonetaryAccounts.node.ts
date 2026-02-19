@@ -19,7 +19,7 @@ export class MonetaryAccounts implements INodeType {
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
-    description: 'Retrieve a list of Monetary Accounts from Bunq API with type filtering. Choose either API Key or OAuth2 credentials.',
+    description: 'Retrieve a list of Monetary Accounts from Bunq API with type filtering using OAuth2 authentication.',
     defaults: {
       name: 'Get Monetary Accounts'
     },
@@ -27,12 +27,8 @@ export class MonetaryAccounts implements INodeType {
     outputs: ['main'],
     credentials: [
       {
-        name: 'bunqApi',
-        required: false,
-      },
-      {
         name: 'bunqOAuth2Api',
-        required: false,
+        required: true,
       },
     ],
     properties: [

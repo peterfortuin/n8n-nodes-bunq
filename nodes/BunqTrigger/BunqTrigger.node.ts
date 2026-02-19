@@ -27,7 +27,7 @@ export class BunqTrigger implements INodeType {
 		icon: 'file:../../assets/Bunq-logo.svg',
 		group: ['trigger'],
 		version: 1,
-		description: 'Starts the workflow when Bunq sends a webhook notification. Choose either API Key or OAuth2 credentials.',
+		description: 'Starts the workflow when Bunq sends a webhook notification using OAuth2 authentication.',
 		defaults: {
 			name: 'Bunq Trigger',
 		},
@@ -35,12 +35,8 @@ export class BunqTrigger implements INodeType {
 		outputs: ['main'],
 		credentials: [
 			{
-				name: 'bunqApi',
-				required: false,
-			},
-			{
 				name: 'bunqOAuth2Api',
-				required: false,
+				required: true,
 			},
 		],
 		webhooks: [

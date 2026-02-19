@@ -19,7 +19,7 @@ export class Payments implements INodeType {
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
-    description: 'Retrieve payments from a Bunq Monetary Account with pagination and date filtering. Choose either API Key or OAuth2 credentials.',
+    description: 'Retrieve payments from a Bunq Monetary Account with pagination and date filtering using OAuth2 authentication.',
     defaults: {
       name: 'Get Payments'
     },
@@ -27,12 +27,8 @@ export class Payments implements INodeType {
     outputs: ['main'],
     credentials: [
       {
-        name: 'bunqApi',
-        required: false,
-      },
-      {
         name: 'bunqOAuth2Api',
-        required: false,
+        required: true,
       },
     ],
     properties: [

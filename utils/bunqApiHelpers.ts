@@ -305,97 +305,17 @@ export async function ensureBunqSession(
   this: BunqApiContext,
   forceRecreate: boolean = false
 ): Promise<IBunqSessionData> {
-  // Try to detect which credential type is being used
-  let oauthCredentialsConfigured = false;
-  try {
-    // Check if OAuth2 credentials are available and valid
-    const oauthCredentials = await this.getCredentials('bunqOAuth2Api');
-    oauthCredentialsConfigured = true;
-    // Only use OAuth flow if we have a valid access token (manual OAuth implementation)
-    if (oauthCredentials && oauthCredentials.accessToken) {
-      return await ensureBunqSessionOAuth.call(this, forceRecreate);
-    }
-    // OAuth credentials are configured but access token is missing
+  // Simplified to only use OAuth2 authentication
+  const oauthCredentials = await this.getCredentials('bunqOAuth2Api');
+  
+  // Check if access token is provided
+  if (!oauthCredentials.accessToken) {
     throw new NodeApiError(this.getNode(), {
       message: 'OAuth access token is required',
       description: 'Please provide a valid OAuth access token in your Bunq OAuth2 API credentials. See the README for instructions on how to obtain an access token.',
     });
-  } catch (error) {
-    // If OAuth credentials are configured but there was an error, re-throw it
-    if (oauthCredentialsConfigured) {
-      throw error;
-    }
-    // OAuth credentials not available, continue to API Key flow
   }
-
-  // Use API Key flow (existing implementation)
-  try {
-    const credentials = await this.getCredentials('bunqApi');
-    
-    const apiKey = credentials.apiKey as string;
-    const publicKey = credentials.publicKey as string;
-    const environment = credentials.environment as string;
-    const baseUrl = getBunqBaseUrl(environment);
-
-    // Get or initialize session data from workflow static data
-    // Use 'global' scope to share session across all Bunq nodes in the workflow
-    const workflowStaticData = this.getWorkflowStaticData('global');
-    let sessionData: IBunqSessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
-
-    // If force recreate is true, clear all session data
-    if (forceRecreate) {
-      sessionData = {};
-      workflowStaticData.bunqSession = sessionData;
-    }
-
-    // Step 1: Create installation if needed
-    if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-      const installationResult = await createInstallation.call(this, baseUrl, publicKey);
-      sessionData.installationToken = installationResult.token;
-      sessionData.serverPublicKey = installationResult.serverPublicKey;
-      workflowStaticData.bunqSession = sessionData;
-    }
-
-    // Step 2: Register device if needed
-    if (!sessionData.deviceServerId) {
-      const deviceId = await registerDevice.call(
-        this,
-        baseUrl,
-        sessionData.installationToken!,
-        apiKey
-      );
-      sessionData.deviceServerId = deviceId;
-      workflowStaticData.bunqSession = sessionData;
-    }
-
-    // Step 3: Create session if needed or if expired
-    const shouldCreateSession = !sessionData.sessionToken || 
-      !sessionData.sessionCreatedAt ||
-      isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
-
-    if (shouldCreateSession) {
-      const sessionResult = await createSession.call(
-        this,
-        baseUrl,
-        sessionData.installationToken!,
-        apiKey
-      );
-      sessionData.sessionToken = sessionResult.token;
-      sessionData.sessionCreatedAt = Date.now();
-      sessionData.userId = sessionResult.userId;
-      sessionData.sessionTimeout = sessionResult.sessionTimeout;
-      workflowStaticData.bunqSession = sessionData;
-    }
-
-    // Always include environment in returned session data
-    sessionData.environment = environment;
-    
-    return sessionData;
-  } catch {
-    // Neither credential type is available
-    throw new NodeApiError(this.getNode(), {
-      message: 'No valid Bunq credentials found',
-      description: 'Please configure either Bunq API Key API or Bunq OAuth2 API credentials for this node',
-    });
-  }
+  
+  // Use OAuth flow
+  return await ensureBunqSessionOAuth.call(this, forceRecreate);
 }
