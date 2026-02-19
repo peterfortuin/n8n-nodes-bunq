@@ -5,15 +5,21 @@ import {
   ICredentialTestRequest,
 } from 'n8n-workflow';
 
-export class BunqApi implements ICredentialType {
-  name = 'bunqApi';
-  displayName = 'Bunq API';
-  documentationUrl = 'https://doc.bunq.com';
+export class BunqOAuth2Api implements ICredentialType {
+  name = 'bunqOAuth2Api';
+  displayName = 'Bunq OAuth2 API';
+  documentationUrl = 'https://doc.bunq.com/basics/authentication/oauth';
   icon: Icon = 'file:../assets/Bunq-logo.svg';
+  httpRequestNode = {
+    name: 'Bunq OAuth2 API',
+    docsUrl: 'https://doc.bunq.com/basics/authentication/oauth',
+    hidden: true,
+    apiBaseUrlPlaceholder: 'https://api.bunq.com/v1',
+  };
   test: ICredentialTestRequest = {
     request: {
-      baseURL: '={{$credentials.environment === "sandbox" ? "https://public-api.sandbox.bunq.com/v1" : "https://api.bunq.com/v1"}}',
-      url: '/installation',
+      baseURL: '={{$credentials.environment === "sandbox" ? "https://public-api.sandbox.bunq.com" : "https://api.bunq.com"}}',
+      url: '/v1/user',
       method: 'GET',
     },
   };
@@ -36,15 +42,15 @@ export class BunqApi implements ICredentialType {
       description: 'The Bunq API environment to use',
     },
     {
-      displayName: 'API Key',
-      name: 'apiKey',
+      displayName: 'OAuth Access Token',
+      name: 'accessToken',
       type: 'string',
       typeOptions: {
         password: true,
       },
       default: '',
       required: true,
-      description: 'The API key from your Bunq account',
+      description: 'OAuth Access Token obtained from Bunq. Follow the OAuth setup instructions in the documentation to obtain this token.',
     },
     {
       displayName: 'Private Key (PEM)',
@@ -56,7 +62,7 @@ export class BunqApi implements ICredentialType {
       },
       default: '',
       required: true,
-      description: 'Your RSA private key in PEM format',
+      description: 'Your RSA private key in PEM format (required for request signing)',
     },
     {
       displayName: 'Public Key (PEM)',
@@ -67,7 +73,7 @@ export class BunqApi implements ICredentialType {
       },
       default: '',
       required: true,
-      description: 'Your RSA public key in PEM format',
+      description: 'Your RSA public key in PEM format (required for installation)',
     },
   ];
 }

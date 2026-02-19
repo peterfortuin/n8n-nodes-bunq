@@ -2,7 +2,7 @@ import {
   IExecuteFunctions,
   INodeType,
   INodeTypeDescription,
-  INodeExecutionData
+  INodeExecutionData,
 } from 'n8n-workflow';
 import { signData } from '../../utils/bunqApiHelpers';
 
@@ -15,7 +15,7 @@ export class SignRequest implements INodeType {
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
-    description: 'Signs a request body using a private key credential',
+    description: 'Signs a request body using a private key from OAuth2 credentials.',
     defaults: {
       name: 'Sign Request'
     },
@@ -23,7 +23,7 @@ export class SignRequest implements INodeType {
     outputs: ['main'],
     credentials: [
       {
-        name: 'bunqApi',
+        name: 'bunqOAuth2Api',
         required: true,
       },
     ],
@@ -46,8 +46,8 @@ export class SignRequest implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    // Load private key from bunqApi credential
-    const credentials = await this.getCredentials('bunqApi');
+    // Load private key from OAuth2 credentials
+    const credentials = await this.getCredentials('bunqOAuth2Api');
     const privateKey = credentials.privateKey as string;
 
     for (let i = 0; i < items.length; i++) {

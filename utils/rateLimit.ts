@@ -69,16 +69,16 @@ export async function enforceRateLimit(
 	url: string,
 ): Promise<void> {
 	// Get credentials to use as part of the rate limit key
-	const creds = await ctx.getCredentials('bunqApi');
+	const creds = await ctx.getCredentials('bunqOAuth2Api');
 
-	if (!creds?.apiKey) {
-		throw new Error('Missing API key in credentials for rate limit enforcement');
+	if (!creds?.accessToken) {
+		throw new Error('Missing access token in credentials for rate limit enforcement');
 	}
 
-	// Create a stable hash of the API key to use as credential identifier
+	// Create a stable hash of the access token to use as credential identifier
 	// This ensures rate limits are enforced per credential across all workflows
 	const credentialHash = createHash('sha256')
-		.update(creds.apiKey as string)
+		.update(creds.accessToken as string)
 		.digest('hex')
 		.substring(0, 16);
 
@@ -100,7 +100,7 @@ export async function enforceRateLimit(
 	if (isSessionServer) {
 		// Special rate limit for session-server endpoint
 		rateLimit = RATE_LIMITS.SESSION_SERVER;
-		key = `rateLimit:bunqApi:${credentialHash}:session-server`;
+		key = `rateLimit:bunqOAuth2Api:${credentialHash}:session-server`;
 	} else {
 		// Per-method rate limits
 		const upperMethod = method.toUpperCase();
@@ -118,7 +118,7 @@ export async function enforceRateLimit(
 				// No rate limit for other methods (DELETE, PATCH, etc.)
 				return;
 		}
-		key = `rateLimit:bunqApi:${credentialHash}:${upperMethod}`;
+		key = `rateLimit:bunqOAuth2Api:${credentialHash}:${upperMethod}`;
 	}
 
 	// Get or initialize rate limit state from module-level Map
