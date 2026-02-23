@@ -223,8 +223,8 @@ export interface IBunqSessionData {
 
 /**
  * Ensures a valid Bunq session exists or creates one if needed (OAuth flow).
- * For OAuth, we still need installation (for request signing) but skip device registration.
- * The OAuth access token is used like an API key to create the session.
+ * For OAuth, we need installation (for request signing), device registration, and session creation.
+ * The OAuth access token is used like an API key throughout the flow.
  * @param this - The Bunq API context (IExecuteFunctions or IHookFunctions)
  * @param forceRecreate - If true, forces recreation of session data
  * @returns Session data with session token and user ID
@@ -259,7 +259,7 @@ async function ensureBunqSessionOAuth(
     workflowStaticData.bunqSessionOAuth = sessionData;
   }
 
-  // For OAuth, we still need installation for request signing
+  // Step 1: Create installation if needed (for request signing)
   if (!sessionData.installationToken || !sessionData.serverPublicKey) {
     const installationResult = await createInstallation.call(this, baseUrl, publicKey);
     sessionData.installationToken = installationResult.token;
@@ -267,7 +267,19 @@ async function ensureBunqSessionOAuth(
     workflowStaticData.bunqSessionOAuth = sessionData;
   }
 
-  // Create session if needed or if expired
+  // Step 2: Register device if needed
+  if (!sessionData.deviceServerId) {
+    const deviceId = await registerDevice.call(
+      this,
+      baseUrl,
+      sessionData.installationToken!,
+      accessToken
+    );
+    sessionData.deviceServerId = deviceId;
+    workflowStaticData.bunqSessionOAuth = sessionData;
+  }
+
+  // Step 3: Create session if needed or if expired
   const shouldCreateSession = !sessionData.sessionToken || 
     !sessionData.sessionCreatedAt ||
     isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
