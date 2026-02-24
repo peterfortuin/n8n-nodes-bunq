@@ -51,6 +51,30 @@ A node that retrieves payments from a specific Monetary Account in the Bunq API 
 - **Last X Days** (optional): Filter to only return payments from the last X days
 - **Items Per Page** (optional): Number of items to fetch per API request (max 200)
 
+### Bunq Create Payment
+A node that creates payments or draft payments from a Bunq Monetary Account to any account (bunq or external).
+
+**Features:**
+- Create actual payments (executed immediately) or draft payments (require manual approval)
+- Send payments to any account via IBAN, email, or phone number
+- Support for payments to:
+  - Other accounts owned by the user
+  - Other bunq users
+  - Accounts at other banks (via IBAN)
+  - Recipients identified by email or phone
+- Proper validation of payment amount, IBAN, email, and phone number formats
+- Comprehensive error handling for missing or invalid inputs
+- Clear feedback messages for payment status
+
+**Parameters:**
+- **From Monetary Account ID**: The ID of the account to send money from (required)
+- **Payment Type**: Choose between "Actual Payment (Execute Immediately)" or "Draft Payment (Requires Manual Approval)" (required)
+- **Recipient Type**: Select how to identify the recipient - IBAN, Email, or Phone Number (required)
+- **Recipient IBAN/Email/Phone**: The recipient's identifier based on the selected type (required)
+- **Recipient Name**: Optional name for IBAN transfers
+- **Amount**: The amount to transfer in EUR (e.g., "10.00") (required)
+- **Description**: Description of the payment for bookkeeping purposes (required)
+
 ### Bunq Trigger
 A trigger node that starts your workflow when Bunq sends a webhook notification. The trigger automatically registers and manages webhooks with the Bunq API.
 
@@ -179,6 +203,12 @@ The Sign Request node signs request bodies using your Bunq private key. This is 
 * [Bunq Callbacks (Webhooks) Documentation](https://doc.bunq.com/basics/callbacks-webhooks)
 
 ## Version history
+
+### 0.2.1
+- Added Bunq Create Payment node for creating payments and draft payments
+  - Support for IBAN, email, and phone number recipients
+  - Option to create actual payments or draft payments
+  - Comprehensive validation and error handling
 
 ### 0.1.0
 - Initial release
