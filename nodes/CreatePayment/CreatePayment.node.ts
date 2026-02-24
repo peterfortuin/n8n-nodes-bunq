@@ -14,9 +14,8 @@ import { BunqHttpClient } from '../../utils/BunqHttpClient';
  * Interface for payment counterparty (recipient)
  */
 interface ICounterparty {
-  iban?: string;
-  email?: string;
-  phone_number?: string;
+  type: string;
+  value: string;
   name?: string;
 }
 
@@ -207,13 +206,13 @@ export class CreatePayment implements INodeType {
 
         // Get recipient information based on type
         let recipientValue = '';
-        let recipientKey = '';
+        let recipientType_API = ''; // API type: EMAIL, PHONE_NUMBER, or IBAN
         let recipientName = '';
 
         switch (recipientType) {
           case 'iban':
             recipientValue = this.getNodeParameter('recipientIban', itemIndex) as string;
-            recipientKey = 'iban';
+            recipientType_API = 'IBAN';
             recipientName = this.getNodeParameter('recipientName', itemIndex, '') as string;
             
             // Basic IBAN validation
@@ -225,7 +224,7 @@ export class CreatePayment implements INodeType {
             break;
           case 'email': {
             recipientValue = this.getNodeParameter('recipientEmail', itemIndex) as string;
-            recipientKey = 'email';
+            recipientType_API = 'EMAIL';
             
             if (!recipientValue || recipientValue.trim().length === 0) {
               throw new NodeOperationError(this.getNode(), 'Recipient email is required');
@@ -242,7 +241,7 @@ export class CreatePayment implements INodeType {
           }
           case 'phone':
             recipientValue = this.getNodeParameter('recipientPhone', itemIndex) as string;
-            recipientKey = 'phone_number';
+            recipientType_API = 'PHONE_NUMBER';
             
             if (!recipientValue || recipientValue.trim().length === 0) {
               throw new NodeOperationError(this.getNode(), 'Recipient phone number is required');
@@ -270,13 +269,14 @@ export class CreatePayment implements INodeType {
           ? `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/draft-payment`
           : `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
 
-        // Build counterparty object
+        // Build counterparty object with correct structure
         const counterparty: ICounterparty = {
-          [recipientKey]: recipientValue,
+          type: recipientType_API,
+          value: recipientValue,
         };
 
-        // Add name if provided and recipient type is IBAN
-        if (recipientType === 'iban' && recipientName && recipientName.trim().length > 0) {
+        // Add name if provided (optional for all types, but especially useful for IBAN)
+        if (recipientName && recipientName.trim().length > 0) {
           counterparty.name = recipientName.trim();
         }
 
