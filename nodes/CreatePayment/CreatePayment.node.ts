@@ -10,6 +10,16 @@ import {
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
 
+/**
+ * Interface for payment counterparty (recipient)
+ */
+interface ICounterparty {
+  iban?: string;
+  email?: string;
+  phone_number?: string;
+  name?: string;
+}
+
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class CreatePayment implements INodeType {
   usableAsTool: boolean = true;
@@ -188,7 +198,7 @@ export class CreatePayment implements INodeType {
         }
 
         // Validate monetary account ID
-        if (monetaryAccountId < 0) {
+        if (monetaryAccountId <= 0) {
           throw new NodeOperationError(
             this.getNode(),
             `Invalid monetary account ID: ${monetaryAccountId}. Must be a positive number.`,
@@ -261,8 +271,7 @@ export class CreatePayment implements INodeType {
           : `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
 
         // Build counterparty object
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const counterparty: Record<string, any> = {
+        const counterparty: ICounterparty = {
           [recipientKey]: recipientValue,
         };
 
