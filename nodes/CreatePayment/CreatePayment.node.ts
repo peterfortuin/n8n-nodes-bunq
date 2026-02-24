@@ -280,17 +280,37 @@ export class CreatePayment implements INodeType {
           counterparty.name = recipientName.trim();
         }
 
-        // Build payment request body
-        const paymentData = {
-          amount: {
-            value: amount,
-            currency: 'EUR',
-          },
-          counterparty_alias: counterparty,
-          description: description,
-        };
-
-        const requestBody = JSON.stringify(paymentData);
+        // Build payment request body - different structure for draft vs regular payments
+        let requestBody: string;
+        
+        if (paymentType === 'draft') {
+          // Draft payments use an "entries" array structure
+          const draftPaymentData = {
+            entries: [
+              {
+                amount: {
+                  value: amount,
+                  currency: 'EUR',
+                },
+                counterparty_alias: counterparty,
+                description: description,
+              },
+            ],
+            number_of_required_accepts: 1,
+          };
+          requestBody = JSON.stringify(draftPaymentData);
+        } else {
+          // Regular payments use direct structure
+          const paymentData = {
+            amount: {
+              value: amount,
+              currency: 'EUR',
+            },
+            counterparty_alias: counterparty,
+            description: description,
+          };
+          requestBody = JSON.stringify(paymentData);
+        }
 
         // Make API request to create payment
         const response = await client.request({
@@ -304,8 +324,11 @@ export class CreatePayment implements INodeType {
         let paymentResult = null;
         if (response.Response && Array.isArray(response.Response)) {
           for (const item of response.Response) {
-            // Response will contain either "Payment" or "DraftPayment" key
-            if (item.Payment) {
+            // Response can contain "Id", "Payment", or "DraftPayment" key
+            if (item.Id) {
+              // POST responses often just return an ID
+              paymentResult = item.Id;
+            } else if (item.Payment) {
               paymentResult = item.Payment;
             } else if (item.DraftPayment) {
               paymentResult = item.DraftPayment;
