@@ -183,7 +183,10 @@ export class CreatePayment implements INodeType {
     
     // Warn if multiple items were provided but only first will be processed
     if (items.length > 1) {
-      this.logger.warn(`CreatePayment node received ${items.length} input items but will only process the first one to create a single payment`);
+      this.logger.warn(
+        `CreatePayment node received ${items.length} input items but will only process the first one to create a single payment. ` +
+        `If you need to create multiple payments, use a Split In Batches or Loop Over Items node before this node.`
+      );
     }
     
     try {
