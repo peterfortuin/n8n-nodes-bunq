@@ -16,11 +16,6 @@ updates:
     # Cooldown period: wait 7 days between dependency updates
     cooldown:
       default-days: 7
-    # Group all npm dependencies into a single PR when possible
-    groups:
-      npm-dependencies:
-        patterns:
-          - "*"
 
   # Monitor GitHub Actions for workflow dependencies
   - package-ecosystem: "github-actions"
@@ -35,8 +30,3 @@ updates:
     # Cooldown period: wait 7 days between dependency updates
     cooldown:
       default-days: 7
-    # Group all GitHub Actions updates into a single PR when possible
-    groups:
-      github-actions:
-        patterns:
-          - "*"
