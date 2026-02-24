@@ -28,7 +28,7 @@ export class CreatePayment implements INodeType {
     icon: 'file:../../assets/Bunq-logo.svg',
     group: ['transform'],
     version: 1,
-    description: 'Create a payment or draft payment from a Bunq Monetary Account to any account (bunq or external)',
+    description: 'Create a single payment or draft payment from a Bunq Monetary Account to any account (bunq or external). Only the first input item is processed.',
     defaults: {
       name: 'Create Payment'
     },
@@ -174,12 +174,15 @@ export class CreatePayment implements INodeType {
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-    const items = this.getInputData();
+    // Get input data (but only process the first item to avoid creating duplicate payments)
+    this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    // Process each input item
-    for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-      try {
+    // Only process the first input item to create a single payment
+    // This prevents creating multiple payments when the node receives multiple input items
+    const itemIndex = 0;
+    
+    try {
         // Get node parameters
         const monetaryAccountId = this.getNodeParameter('monetaryAccountId', itemIndex) as number;
         const paymentType = this.getNodeParameter('paymentType', itemIndex) as string;
@@ -352,20 +355,19 @@ export class CreatePayment implements INodeType {
           },
         });
 
-      } catch (error) {
-        if (this.continueOnFail()) {
-          returnData.push({
-            json: {
-              success: false,
-              error: error.message,
-            },
-            pairedItem: {
-              item: itemIndex,
-            },
-          });
-        } else {
-          throw error;
-        }
+    } catch (error) {
+      if (this.continueOnFail()) {
+        returnData.push({
+          json: {
+            success: false,
+            error: error.message,
+          },
+          pairedItem: {
+            item: itemIndex,
+          },
+        });
+      } else {
+        throw error;
       }
     }
 
