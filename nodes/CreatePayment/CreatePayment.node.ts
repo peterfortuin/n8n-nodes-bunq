@@ -281,36 +281,30 @@ export class CreatePayment implements INodeType {
         }
 
         // Build payment request body - different structure for draft vs regular payments
-        let requestBody: string;
-        
-        if (paymentType === 'draft') {
-          // Draft payments use an "entries" array structure
-          const draftPaymentData = {
-            entries: [
-              {
-                amount: {
-                  value: amount,
-                  currency: 'EUR',
+        const requestBody = paymentType === 'draft'
+          ? JSON.stringify({
+              // Draft payments use an "entries" array structure
+              entries: [
+                {
+                  amount: {
+                    value: amount,
+                    currency: 'EUR',
+                  },
+                  counterparty_alias: counterparty,
+                  description: description,
                 },
-                counterparty_alias: counterparty,
-                description: description,
+              ],
+              number_of_required_accepts: 1,
+            })
+          : JSON.stringify({
+              // Regular payments use direct structure
+              amount: {
+                value: amount,
+                currency: 'EUR',
               },
-            ],
-            number_of_required_accepts: 1,
-          };
-          requestBody = JSON.stringify(draftPaymentData);
-        } else {
-          // Regular payments use direct structure
-          const paymentData = {
-            amount: {
-              value: amount,
-              currency: 'EUR',
-            },
-            counterparty_alias: counterparty,
-            description: description,
-          };
-          requestBody = JSON.stringify(paymentData);
-        }
+              counterparty_alias: counterparty,
+              description: description,
+            });
 
         // Make API request to create payment
         const response = await client.request({
