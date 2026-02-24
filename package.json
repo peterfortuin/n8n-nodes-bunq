@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-bunq",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "n8n community node for Bunq request signing with device private keys",
     "license": "MIT",
     "homepage": "",
