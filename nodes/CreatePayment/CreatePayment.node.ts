@@ -206,13 +206,13 @@ export class CreatePayment implements INodeType {
 
         // Get recipient information based on type
         let recipientValue = '';
-        let recipientType_API = ''; // API type: EMAIL, PHONE_NUMBER, or IBAN
+        let recipientApiType = ''; // API type: EMAIL, PHONE_NUMBER, or IBAN
         let recipientName = '';
 
         switch (recipientType) {
           case 'iban':
             recipientValue = this.getNodeParameter('recipientIban', itemIndex) as string;
-            recipientType_API = 'IBAN';
+            recipientApiType = 'IBAN';
             recipientName = this.getNodeParameter('recipientName', itemIndex, '') as string;
             
             // Basic IBAN validation
@@ -224,7 +224,7 @@ export class CreatePayment implements INodeType {
             break;
           case 'email': {
             recipientValue = this.getNodeParameter('recipientEmail', itemIndex) as string;
-            recipientType_API = 'EMAIL';
+            recipientApiType = 'EMAIL';
             
             if (!recipientValue || recipientValue.trim().length === 0) {
               throw new NodeOperationError(this.getNode(), 'Recipient email is required');
@@ -241,7 +241,7 @@ export class CreatePayment implements INodeType {
           }
           case 'phone':
             recipientValue = this.getNodeParameter('recipientPhone', itemIndex) as string;
-            recipientType_API = 'PHONE_NUMBER';
+            recipientApiType = 'PHONE_NUMBER';
             
             if (!recipientValue || recipientValue.trim().length === 0) {
               throw new NodeOperationError(this.getNode(), 'Recipient phone number is required');
@@ -271,7 +271,7 @@ export class CreatePayment implements INodeType {
 
         // Build counterparty object with correct structure
         const counterparty: ICounterparty = {
-          type: recipientType_API,
+          type: recipientApiType,
           value: recipientValue,
         };
 
