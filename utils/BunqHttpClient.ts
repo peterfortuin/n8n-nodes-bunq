@@ -205,8 +205,13 @@ export class BunqHttpClient {
 			headers['X-Bunq-Client-Authentication'] = sessionToken;
 		}
 
-		// Add signature header only when there is a request body
-		if (body && this.privateKey) {
+		// Add signature header for all requests that have a body
+		if (body) {
+			if (!this.privateKey) {
+				throw new Error(
+					'A private key is required for signing Bunq API requests. Please set the Private Key (PEM) in your Bunq API credentials.',
+				);
+			}
 			const signature = signData(body, this.privateKey);
 			headers['X-Bunq-Client-Signature'] = signature;
 		}
