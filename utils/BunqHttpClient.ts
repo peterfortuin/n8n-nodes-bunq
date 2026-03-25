@@ -206,7 +206,7 @@ export class BunqHttpClient {
 		}
 
 		// Add signature header for all requests that have a body
-		if (body) {
+		if (body !== undefined) {
 			if (!this.privateKey) {
 				throw new Error(
 					'A private key is required for signing Bunq API requests. Please set the Private Key (PEM) in your Bunq API credentials.',
@@ -223,7 +223,7 @@ export class BunqHttpClient {
 			headers,
 		};
 
-		if (body) {
+		if (body !== undefined) {
 			httpRequestOptions.body = body;
 		}
 
