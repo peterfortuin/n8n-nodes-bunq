@@ -9,6 +9,7 @@ import {
   ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class Payments implements INodeType {
@@ -206,7 +207,7 @@ export class Payments implements INodeType {
         if (this.continueOnFail()) {
           returnData.push({
             json: {
-              error: error.message,
+              error: getErrorMessage(error),
             },
             pairedItem: {
               item: itemIndex,
