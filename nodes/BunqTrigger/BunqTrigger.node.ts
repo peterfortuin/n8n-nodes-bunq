@@ -230,23 +230,50 @@ export class BunqTrigger implements INodeType {
 
 				this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
-				// Build notification filter for single category
-				const notificationFilters = [{
-					category,
-					notification_target: webhookUrl,
-				}];
+				const client = new BunqHttpClient(this);
+				const notificationFilterUrl = `/user/${sessionData.userId}/notification-filter-url`;
+
+				// Fetch existing filters so we don't overwrite them.
+				// The Bunq API replaces the entire list on POST, so we must merge.
+				const existingFilters: Array<{ category: string; notification_target: string }> = [];
+				try {
+					const existing = await client.request({
+						method: 'GET',
+						url: notificationFilterUrl,
+						sessionToken: sessionData.sessionToken,
+					});
+
+					if (existing.Response && Array.isArray(existing.Response)) {
+						for (const item of existing.Response) {
+							if (item.NotificationFilterUrl) {
+								const filters = item.NotificationFilterUrl.notification_filters || [];
+								for (const f of filters) {
+									// Skip any stale entry for the same category+URL to avoid duplicates
+									if (!(f.category === category && f.notification_target === webhookUrl)) {
+										existingFilters.push({ category: f.category, notification_target: f.notification_target });
+									}
+								}
+							}
+						}
+					}
+				} catch (error) {
+					// If we cannot fetch existing filters, proceed with only the new one.
+					// This is a best-effort approach; worst case, other filters are temporarily removed.
+					this.logger.warn(`Could not fetch existing notification filters, proceeding with new filter only: ${getErrorMessage(error)}`);
+				}
+
+				// Append the new filter and POST the merged list
+				const mergedFilters = [...existingFilters, { category, notification_target: webhookUrl }];
 
 				const payload = JSON.stringify({
-					notification_filters: notificationFilters,
+					notification_filters: mergedFilters,
 				});
 
 				try {
-					this.logger.debug(`Registering webhook with Bunq API...`);
-					// Register the webhook with Bunq using canonical HTTP client
-					const client = new BunqHttpClient(this);
+					this.logger.debug(`Registering webhook with Bunq API (total filters after merge: ${mergedFilters.length})...`);
 					await client.request({
 						method: 'POST',
-						url: `/user/${sessionData.userId}/notification-filter-url`,
+						url: notificationFilterUrl,
 						body: payload,
 						sessionToken: sessionData.sessionToken,
 					});
