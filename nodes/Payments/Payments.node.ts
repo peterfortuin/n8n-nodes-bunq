@@ -9,6 +9,7 @@ import {
   ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class Payments implements INodeType {
@@ -41,22 +42,34 @@ export class Payments implements INodeType {
         description: 'The ID of the monetary account to retrieve payments from',
       },
       {
+        displayName: 'Return All',
+        name: 'returnAll',
+        type: 'boolean',
+        default: false,
+        description: 'Whether to return all results or only up to a given limit',
+      },
+      {
+        displayName: 'Limit',
+        name: 'limit',
+        type: 'number',
+        typeOptions: {
+          minValue: 1,
+        },
+        default: 50,
+        description: 'Max number of results to return',
+        displayOptions: {
+          show: {
+            returnAll: [false],
+          },
+        },
+      },
+      {
         displayName: 'Additional Options',
         name: 'additionalOptions',
         type: 'collection',
         placeholder: 'Add Option',
         default: {},
         options: [
-          {
-            displayName: 'Limit',
-            name: 'limit',
-            type: 'number',
-            typeOptions: {
-              minValue: 1,
-            },
-            default: 50,
-            description: 'Max number of results to return',
-          },
           {
             displayName: 'Last X Days',
             name: 'lastDays',
@@ -89,19 +102,16 @@ export class Payments implements INodeType {
       try {
         // Get node parameters
         const monetaryAccountId = this.getNodeParameter('monetaryAccountId', itemIndex) as number;
+        const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+        const limit = returnAll ? 0 : (this.getNodeParameter('limit', itemIndex) as number);
         const additionalOptions = this.getNodeParameter('additionalOptions', itemIndex, {}) as {
-          limit?: number;
           lastDays?: number;
           itemsPerPage?: number;
         };
 
-        // If limit is not provided or is 0, we return all results
-        const limit = additionalOptions.limit || 0;
-        const returnAll = limit === 0;
-
         // Ensure we have a valid Bunq session
         const sessionData = await ensureBunqSession.call(this, false);
-        
+
         if (!sessionData.sessionToken || !sessionData.userId) {
           throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
         }
@@ -137,7 +147,7 @@ export class Payments implements INodeType {
               // Each item is an object with 'Payment' as the key
               if (item.Payment) {
                 const payment = item.Payment;
-                
+
                 // Apply date filter if specified
                 if (dateFilter) {
                   const paymentDate = new Date(payment.created);
@@ -148,10 +158,10 @@ export class Payments implements INodeType {
                     break;
                   }
                 }
-                
+
                 allPayments.push(payment);
 
-                // Check if we've reached the limit (if not returning all)
+                // Check if we've reached the limit (only when not returning all)
                 if (!returnAll && allPayments.length >= limit) {
                   shouldContinue = false;
                   break;
@@ -174,7 +184,7 @@ export class Payments implements INodeType {
           }
         }
 
-        // Apply limit if not returning all
+        // Trim to limit if we collected more than needed
         if (!returnAll && allPayments.length > limit) {
           allPayments = allPayments.slice(0, limit);
         }
@@ -206,7 +216,7 @@ export class Payments implements INodeType {
         if (this.continueOnFail()) {
           returnData.push({
             json: {
-              error: error.message,
+              error: getErrorMessage(error),
             },
             pairedItem: {
               item: itemIndex,
