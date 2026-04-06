@@ -6,9 +6,7 @@ import {
 	INodeTypeDescription,
 	NodeApiError,
 } from 'n8n-workflow';
-import {
-	ensureBunqSession,
-} from '../../utils/bunqApiHelpers';
+import { ensureBunqSession } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
 
 /**
@@ -91,7 +89,7 @@ export class BunqTrigger implements INodeType {
 					{
 						name: 'Mutation',
 						value: 'MUTATION',
-						description: 'Notifications for any action that affects a monetary account\'s balance',
+						description: "Notifications for any action that affects a monetary account's balance",
 					},
 					{
 						name: 'OAuth',
@@ -156,10 +154,7 @@ export class BunqTrigger implements INodeType {
 
 				try {
 					// Ensure session exists using shared helper
-					const sessionData = await ensureBunqSession.call(
-						this,
-						false,
-					);
+					const sessionData = await ensureBunqSession.call(this, false);
 
 					if (!sessionData.sessionToken || !sessionData.userId) {
 						this.logger.debug('No valid session found');
@@ -215,26 +210,29 @@ export class BunqTrigger implements INodeType {
 				this.logger.info(`Creating webhook for category: ${category} at ${webhookUrl}`);
 
 				// Ensure session exists using shared helper
-				const sessionData = await ensureBunqSession.call(
-					this,
-					false,
-				);
+				const sessionData = await ensureBunqSession.call(this, false);
 
 				if (!sessionData.sessionToken || !sessionData.userId) {
 					this.logger.error('Failed to establish session with Bunq API');
-					throw new NodeApiError(this.getNode(), { error: 'Session creation failed' }, {
-						message: 'Failed to create Bunq session',
-						description: 'Could not establish a session with the Bunq API',
-					});
+					throw new NodeApiError(
+						this.getNode(),
+						{ error: 'Session creation failed' },
+						{
+							message: 'Failed to create Bunq session',
+							description: 'Could not establish a session with the Bunq API',
+						},
+					);
 				}
 
 				this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
 				// Build notification filter for single category
-				const notificationFilters = [{
-					category,
-					notification_target: webhookUrl,
-				}];
+				const notificationFilters = [
+					{
+						category,
+						notification_target: webhookUrl,
+					},
+				];
 
 				const payload = JSON.stringify({
 					notification_filters: notificationFilters,
@@ -274,16 +272,15 @@ export class BunqTrigger implements INodeType {
 
 				try {
 					// Ensure session exists using shared helper
-					const sessionData = await ensureBunqSession.call(
-						this,
-						false,
-					);
+					const sessionData = await ensureBunqSession.call(this, false);
 
 					if (!sessionData.sessionToken || !sessionData.userId) {
 						// If we can't get a session during deletion, it likely means the API key
 						// or credentials are no longer valid. Since the webhook can't be accessed
 						// anyway, we consider this a successful deletion scenario.
-						this.logger.info('No valid session available - webhook cannot be accessed (treating as deleted)');
+						this.logger.info(
+							'No valid session available - webhook cannot be accessed (treating as deleted)',
+						);
 						return true;
 					}
 
@@ -318,7 +315,9 @@ export class BunqTrigger implements INodeType {
 						}
 					}
 
-					this.logger.debug(`Keeping ${filtersToKeep.length} filters, removing webhook ${webhookUrl}`);
+					this.logger.debug(
+						`Keeping ${filtersToKeep.length} filters, removing webhook ${webhookUrl}`,
+					);
 
 					// Update filters (removing ours) using canonical HTTP client
 					const payload = JSON.stringify({
@@ -337,7 +336,9 @@ export class BunqTrigger implements INodeType {
 				} catch (error) {
 					// If deletion fails, don't throw - webhook might already be gone
 					// Log for debugging but consider deletion successful
-					this.logger.debug(`Failed to delete webhook (may already be deleted): ${getErrorMessage(error)}`);
+					this.logger.debug(
+						`Failed to delete webhook (may already be deleted): ${getErrorMessage(error)}`,
+					);
 					return true;
 				}
 			},
