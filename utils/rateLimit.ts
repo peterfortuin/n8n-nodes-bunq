@@ -13,7 +13,7 @@ type BunqApiContext = IExecuteFunctions | IHookFunctions;
 export const RATE_LIMITS = {
 	GET: {
 		maxRequests: 3,
-		windowMs: 4000, // 3 seconds
+		windowMs: 4000, // 4 seconds
 	},
 	POST: {
 		maxRequests: 5,
