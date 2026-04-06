@@ -10,11 +10,32 @@ export class BunqApi implements ICredentialType {
   displayName = 'Bunq API';
   documentationUrl = 'https://doc.bunq.com';
   icon: Icon = 'file:../assets/Bunq-logo.svg';
+  /**
+   * Credential test: POST to /installation with the configured public key.
+   *
+   * This verifies two things:
+   *   1. The Bunq API server is reachable for the selected environment.
+   *   2. The Public Key (PEM) is accepted as a valid RSA key by Bunq.
+   *
+   * Limitation: the API Key and Private Key cannot be validated here because
+   * Bunq's authentication is a multi-step flow (installation → device
+   * registration → session creation) that cannot be expressed as a single HTTP
+   * request. Those credentials are validated on first node execution.
+   */
   test: ICredentialTestRequest = {
     request: {
       baseURL: '={{$credentials.environment === "sandbox" ? "https://public-api.sandbox.bunq.com/v1" : "https://api.bunq.com/v1"}}',
       url: '/installation',
-      method: 'GET',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'User-Agent': 'n8n-nodes-bunq/credential-test',
+        'X-Bunq-Language': 'en_US',
+        'X-Bunq-Region': 'nl_NL',
+        'X-Bunq-Client-Request-Id': 'credential-test',
+      },
+      body: '={"client_public_key":"{{$credentials.publicKey}}"}',
     },
   };
   properties: INodeProperties[] = [
@@ -67,7 +88,7 @@ export class BunqApi implements ICredentialType {
       },
       default: '',
       required: true,
-      description: 'Your RSA public key in PEM format',
+      description: 'Your RSA public key in PEM format. This key is validated by the credential test.',
     },
   ];
 }
