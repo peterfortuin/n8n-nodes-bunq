@@ -53,16 +53,20 @@ export class BunqSession implements INodeType {
         forceRecreate
       );
 
-      // Return the session data for all items
+      // Return non-sensitive session metadata only.
+      // Tokens (sessionToken, installationToken) are intentionally excluded
+      // from the output because n8n stores execution data in its database and
+      // may surface it in logs or downstream webhook payloads.  The tokens are
+      // cached in workflowStaticData and used automatically by other Bunq nodes.
       const returnData: INodeExecutionData[] = items.map(() => ({
         json: {
-          sessionToken: sessionData.sessionToken,
-          installationToken: sessionData.installationToken,
-          deviceServerId: sessionData.deviceServerId,
           userId: sessionData.userId,
+          deviceServerId: sessionData.deviceServerId,
           sessionCreatedAt: sessionData.sessionCreatedAt,
           sessionAge: sessionData.sessionCreatedAt ? Date.now() - sessionData.sessionCreatedAt : 0,
           environment: sessionData.environment,
+          hasSessionToken: Boolean(sessionData.sessionToken),
+          hasInstallationToken: Boolean(sessionData.installationToken),
         }
       }));
 
