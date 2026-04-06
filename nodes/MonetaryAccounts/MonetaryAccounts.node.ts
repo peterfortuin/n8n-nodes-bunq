@@ -9,6 +9,7 @@ import {
   ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class MonetaryAccounts implements INodeType {
@@ -60,15 +61,16 @@ export class MonetaryAccounts implements INodeType {
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-    const returnData: INodeExecutionData[] = [];
+    // This node is a node-level operation: it fetches accounts once and
+    // outputs each account as a separate item, independent of how many
+    // input items were provided.  accountTypes is a node-level setting
+    // so it is read with index 0 (the same value for every run).
+    const accountTypes = this.getNodeParameter('accountTypes', 0) as string[];
 
     try {
-      // Get node parameters
-      const accountTypes = this.getNodeParameter('accountTypes', 0) as string[];
-
       // Ensure we have a valid Bunq session
       const sessionData = await ensureBunqSession.call(this, false);
-      
+
       if (!sessionData.sessionToken || !sessionData.userId) {
         throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
       }
@@ -79,10 +81,10 @@ export class MonetaryAccounts implements INodeType {
       // Fetch accounts for each selected type
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const allAccounts: Array<Record<string, any>> = [];
-      
+
       for (const accountType of accountTypes) {
         let endpoint = '';
-        
+
         switch (accountType) {
           case 'bank':
             endpoint = `/user/${sessionData.userId}/monetary-account-bank`;
@@ -119,44 +121,25 @@ export class MonetaryAccounts implements INodeType {
         }
       }
 
-      // Return each account as a separate n8n item
-      for (const account of allAccounts) {
-        returnData.push({
-          json: account,
-        });
+      // Return each account as a separate n8n item.
+      // If no accounts were found, return a single informational item.
+      if (allAccounts.length === 0) {
+        return this.prepareOutputData([{
+          json: {
+            message: 'No monetary accounts found for the selected types',
+            accountTypes,
+          },
+        }]);
       }
 
-      // If no accounts were found, return empty result for each input item
-      if (returnData.length === 0) {
-        const items = this.getInputData();
-        for (let i = 0; i < items.length; i++) {
-          returnData.push({
-            json: {
-              message: 'No monetary accounts found for the selected types',
-              accountTypes,
-            },
-            pairedItem: {
-              item: i,
-            },
-          });
-        }
-      }
-
+      const returnData: INodeExecutionData[] = allAccounts.map((account) => ({ json: account }));
       return this.prepareOutputData(returnData);
 
     } catch (error) {
       if (this.continueOnFail()) {
-        const items = this.getInputData();
-        // Return error data for all items if continueOnFail is enabled
-        const returnData: INodeExecutionData[] = items.map((_, i) => ({
-          json: {
-            error: error.message,
-          },
-          pairedItem: {
-            item: i,
-          },
-        }));
-        return this.prepareOutputData(returnData);
+        return this.prepareOutputData([{
+          json: { error: getErrorMessage(error) },
+        }]);
       }
       throw error;
     }
