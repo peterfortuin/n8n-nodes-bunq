@@ -58,7 +58,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * Enforces API rate limit for a specific endpoint and method.
  * Waits until the next request is allowed instead of throwing.
- * 
+ *
  * @param ctx - The n8n execution or hook context
  * @param method - The HTTP method (GET, POST, PUT, etc.)
  * @param url - The endpoint URL

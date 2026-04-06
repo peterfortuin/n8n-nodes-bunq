@@ -57,7 +57,7 @@ export class BunqHttpClient {
 			// Already initialized
 			return;
 		}
-		
+
 		const credentials = await this.context.getCredentials('bunqApi');
 		this.environment = credentials.environment as string;
 		this.baseUrl = getBunqBaseUrl(this.environment);
@@ -97,8 +97,7 @@ export class BunqHttpClient {
 				const statusCode = errorWithResponse.response.status;
 				const responseId =
 					errorWithResponse.response.headers?.['x-bunq-client-response-id'] || 'N/A';
-				const callTime =
-					errorWithResponse.response.headers?.['date'] || new Date().toUTCString();
+				const callTime = errorWithResponse.response.headers?.['date'] || new Date().toUTCString();
 				const endpoint = errorWithResponse.config?.url || fullUrl;
 
 				// Log error details for 4xx and 5xx errors
@@ -169,13 +168,7 @@ export class BunqHttpClient {
 		// Initialize if not already done
 		await this.initialize();
 
-		const {
-			method,
-			url,
-			body,
-			sessionToken,
-			additionalHeaders = {},
-		} = options;
+		const { method, url, body, sessionToken, additionalHeaders = {} } = options;
 
 		// Enforce rate limiting before making the request
 		await enforceRateLimit(this.context, method, url);
