@@ -380,11 +380,11 @@ export class BunqTrigger implements INodeType {
 						);
 					}
 
+					// POST succeeded; we either confirmed the filter or couldn't verify — return success.
 					this.logger.info(`Successfully registered webhook for category ${category}`);
 					return true;
 				}
 
-				// Unreachable: the loop always returns or throws, but TypeScript needs this
 				return true;
 			},
 
