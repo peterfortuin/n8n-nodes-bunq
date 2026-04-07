@@ -10,13 +10,7 @@ import {
 	ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
-
-/**
- * Extract error message from unknown error type
- */
-function getErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : 'Unknown error';
-}
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class BunqTrigger implements INodeType {

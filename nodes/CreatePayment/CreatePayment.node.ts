@@ -9,6 +9,7 @@ import {
   ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 /**
  * Interface for payment counterparty (recipient)
@@ -357,7 +358,7 @@ export class CreatePayment implements INodeType {
           returnData.push({
             json: {
               success: false,
-              error: error.message,
+              error: getErrorMessage(error),
             },
             pairedItem: {
               item: itemIndex,

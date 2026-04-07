@@ -7,6 +7,7 @@ import {
 import {
   ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class BunqSession implements INodeType {
@@ -73,7 +74,7 @@ export class BunqSession implements INodeType {
         // Return error data for all items if continueOnFail is enabled
         const returnData: INodeExecutionData[] = items.map((_, i) => ({
           json: {
-            error: error.message,
+            error: getErrorMessage(error),
           },
           pairedItem: {
             item: i,
