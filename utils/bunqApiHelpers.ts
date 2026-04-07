@@ -36,13 +36,11 @@ export function signData(data: string, privateKey: string): string {
 
 /**
  * Create installation with Bunq API
- * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param publicKey - The client's public key for installation
  * @returns Installation token and server public key
  */
 export async function createInstallation(
   this: BunqApiContext,
-  baseUrl: string,
   publicKey: string
 ): Promise<{ token: string; serverPublicKey: string }> {
   const payload = JSON.stringify({ client_public_key: publicKey });
@@ -84,14 +82,12 @@ export async function createInstallation(
  * to the IP address of the caller. This provides better security but requires that
  * API calls come from the same IP address. If your IP changes (e.g., dynamic IPs,
  * mobile networks, VPN), you'll need to re-register the device.
- * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param installationToken - Token from installation step
  * @param apiKey - The Bunq API key
  * @returns Device ID
  */
 export async function registerDevice(
   this: BunqApiContext,
-  baseUrl: string,
   installationToken: string,
   apiKey: string
 ): Promise<string> {
@@ -134,14 +130,12 @@ export async function registerDevice(
 
 /**
  * Create session with Bunq API
- * @param baseUrl - The Bunq API base URL (production or sandbox)
  * @param installationToken - Token from installation step
  * @param apiKey - The Bunq API key
  * @returns Session token, user ID, and session timeout (in seconds)
  */
 export async function createSession(
   this: BunqApiContext,
-  baseUrl: string,
   installationToken: string,
   apiKey: string
 ): Promise<{ token: string; userId: string; sessionTimeout: number }> {
@@ -238,7 +232,6 @@ export async function ensureBunqSession(
   const apiKey = credentials.apiKey as string;
   const publicKey = credentials.publicKey as string;
   const environment = credentials.environment as string;
-  const baseUrl = getBunqBaseUrl(environment);
 
   // Get or initialize session data from workflow static data
   // Use 'global' scope to share session across all Bunq nodes in the workflow
@@ -253,7 +246,7 @@ export async function ensureBunqSession(
 
   // Step 1: Create installation if needed
   if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-    const installationResult = await createInstallation.call(this, baseUrl, publicKey);
+    const installationResult = await createInstallation.call(this, publicKey);
     sessionData.installationToken = installationResult.token;
     sessionData.serverPublicKey = installationResult.serverPublicKey;
     workflowStaticData.bunqSession = sessionData;
@@ -263,7 +256,6 @@ export async function ensureBunqSession(
   if (!sessionData.deviceServerId) {
     const deviceId = await registerDevice.call(
       this,
-      baseUrl,
       sessionData.installationToken!,
       apiKey
     );
@@ -272,14 +264,13 @@ export async function ensureBunqSession(
   }
 
   // Step 3: Create session if needed or if expired
-  const shouldCreateSession = !sessionData.sessionToken || 
+  const shouldCreateSession = !sessionData.sessionToken ||
     !sessionData.sessionCreatedAt ||
     isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
 
   if (shouldCreateSession) {
     const sessionResult = await createSession.call(
       this,
-      baseUrl,
       sessionData.installationToken!,
       apiKey
     );
