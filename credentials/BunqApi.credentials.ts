@@ -35,7 +35,7 @@ export class BunqApi implements ICredentialType {
         'X-Bunq-Region': 'nl_NL',
         'X-Bunq-Client-Request-Id': '={{"credential-test-" + Date.now()}}',
       },
-      body: '={"client_public_key":"{{$credentials.publicKey}}"}',
+      body: '={{ { client_public_key: $credentials.publicKey } }}',
     },
   };
   properties: INodeProperties[] = [
