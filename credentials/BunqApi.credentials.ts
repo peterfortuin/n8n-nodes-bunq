@@ -33,7 +33,7 @@ export class BunqApi implements ICredentialType {
         'User-Agent': 'n8n-nodes-bunq/credential-test',
         'X-Bunq-Language': 'en_US',
         'X-Bunq-Region': 'nl_NL',
-        'X-Bunq-Client-Request-Id': 'credential-test',
+        'X-Bunq-Client-Request-Id': '={{"credential-test-" + Date.now()}}',
       },
       body: '={"client_public_key":"{{$credentials.publicKey}}"}',
     },
