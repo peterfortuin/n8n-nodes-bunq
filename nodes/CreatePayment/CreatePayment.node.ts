@@ -65,10 +65,15 @@ export class CreatePayment implements INodeType {
             value: 'draft',
             description: 'Payment is created as a draft requiring manual approval in the bunq app',
           },
+          {
+            name: 'Actual Payment with Draft Fallback',
+            value: 'actualWithDraftFallback',
+            description: 'Attempts an actual payment first; if that fails for any reason, automatically creates a draft payment instead',
+          },
         ],
         default: 'actual',
         required: true,
-        description: 'Whether to create an actual payment or a draft payment',
+        description: 'Whether to create an actual payment, a draft payment, or attempt an actual payment with automatic fallback to draft on permission errors',
       },
       {
         displayName: 'Recipient Type',
@@ -265,11 +270,6 @@ export class CreatePayment implements INodeType {
         // Create HTTP client
         const client = new BunqHttpClient(this);
 
-        // Determine endpoint based on payment type
-        const endpoint = paymentType === 'draft'
-          ? `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/draft-payment`
-          : `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
-
         // Build counterparty object with correct structure
         const counterparty: ICounterparty = {
           type: recipientApiType,
@@ -281,54 +281,93 @@ export class CreatePayment implements INodeType {
           counterparty.name = recipientName.trim();
         }
 
-        // Build payment request body - different structure for draft vs regular payments
-        const requestBody = paymentType === 'draft'
-          ? JSON.stringify({
-              // Draft payments use an "entries" array structure
-              entries: [
-                {
-                  amount: {
-                    value: amount,
-                    currency: 'EUR',
-                  },
-                  counterparty_alias: counterparty,
-                  description: description,
-                },
-              ],
-              number_of_required_accepts: 1,
-            })
-          : JSON.stringify({
-              // Regular payments use direct structure
+        // Helper to build the actual payment request body
+        const buildActualRequestBody = () => JSON.stringify({
+          amount: {
+            value: amount,
+            currency: 'EUR',
+          },
+          counterparty_alias: counterparty,
+          description: description,
+        });
+
+        // Helper to build the draft payment request body
+        const buildDraftRequestBody = () => JSON.stringify({
+          entries: [
+            {
               amount: {
                 value: amount,
                 currency: 'EUR',
               },
               counterparty_alias: counterparty,
               description: description,
-            });
-
-        // Make API request to create payment
-        const response = await client.request({
-          method: 'POST',
-          url: endpoint,
-          body: requestBody,
-          sessionToken: sessionData.sessionToken,
+            },
+          ],
+          number_of_required_accepts: 1,
         });
 
-        // Extract payment data from response
-        let paymentResult = null;
-        if (response.Response && Array.isArray(response.Response)) {
-          for (const item of response.Response) {
-            // Response can contain "Id", "Payment", or "DraftPayment" key
-            if (item.Id) {
-              // POST responses often just return an ID
-              paymentResult = item.Id;
-            } else if (item.Payment) {
-              paymentResult = item.Payment;
-            } else if (item.DraftPayment) {
-              paymentResult = item.DraftPayment;
+        // Helper to extract payment result from API response
+        const extractPaymentResult = (response: Record<string, unknown>) => {
+          if (response.Response && Array.isArray(response.Response)) {
+            for (const item of response.Response as Record<string, unknown>[]) {
+              if (item.Id) return item.Id;
+              if (item.Payment) return item.Payment;
+              if (item.DraftPayment) return item.DraftPayment;
             }
           }
+          return null;
+        };
+
+        let paymentResult = null;
+        let effectivePaymentType = paymentType;
+
+        if (paymentType === 'actualWithDraftFallback') {
+          // Try actual payment first; fall back to draft on any error
+          const actualEndpoint = `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
+          try {
+            const response = await client.request({
+              method: 'POST',
+              url: actualEndpoint,
+              body: buildActualRequestBody(),
+              sessionToken: sessionData.sessionToken,
+            });
+            paymentResult = extractPaymentResult(response);
+            effectivePaymentType = 'actual';
+          } catch (actualPaymentError) {
+            // Actual payment failed – log the error and fall back to draft payment
+            this.logger.warn('Actual payment failed, falling back to draft payment', {
+              error: getErrorMessage(actualPaymentError),
+            });
+            const draftEndpoint = `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/draft-payment`;
+            const draftResponse = await client.request({
+              method: 'POST',
+              url: draftEndpoint,
+              body: buildDraftRequestBody(),
+              sessionToken: sessionData.sessionToken,
+            });
+            paymentResult = extractPaymentResult(draftResponse);
+            effectivePaymentType = 'draft';
+          }
+        } else {
+          // Determine endpoint based on payment type
+          const endpoint = paymentType === 'draft'
+            ? `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/draft-payment`
+            : `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
+
+          // Build payment request body - different structure for draft vs regular payments
+          const requestBody = paymentType === 'draft'
+            ? buildDraftRequestBody()
+            : buildActualRequestBody();
+
+          // Make API request to create payment
+          const response = await client.request({
+            method: 'POST',
+            url: endpoint,
+            body: requestBody,
+            sessionToken: sessionData.sessionToken,
+          });
+
+          paymentResult = extractPaymentResult(response);
         }
 
         if (!paymentResult) {
@@ -342,9 +381,10 @@ export class CreatePayment implements INodeType {
         returnData.push({
           json: {
             success: true,
-            paymentType: paymentType,
+            paymentType: effectivePaymentType,
+            requestedPaymentType: paymentType,
             payment: paymentResult,
-            message: paymentType === 'draft'
+            message: effectivePaymentType === 'draft'
               ? 'Draft payment created successfully. Please approve it in the bunq app.'
               : 'Payment created successfully.',
           },
