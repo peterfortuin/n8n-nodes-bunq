@@ -1,119 +1,124 @@
 # n8n-nodes-bunq
 
-This is an n8n community node. It lets you use the Bunq API in your n8n workflows, including support for request signing with device private keys and webhook-based triggers.
+[![npm version](https://img.shields.io/npm/v/n8n-nodes-bunq)](https://www.npmjs.com/package/n8n-nodes-bunq)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+An n8n community node package for integrating with the [Bunq API](https://doc.bunq.com). Supports retrieving accounts and payments, creating payments, webhook-based triggers, and authenticated request signing.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
 
-[Installation](#installation)  
-[Operations](#operations)  
-[Credentials](#credentials)  
-[Compatibility](#compatibility)  
-[Usage](#usage)  
-[Resources](#resources)  
-[Version history](#version-history)  
+## Table of contents
+
+- [Installation](#installation)
+- [Nodes](#nodes)
+- [Credentials](#credentials)
+- [Compatibility](#compatibility)
+- [Usage](#usage)
+- [Resources](#resources)
+- [Version history](#version-history)
 
 ## Installation
 
 Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
 
-## Operations
+## Nodes
 
-This package includes the following nodes:
+| Node | Type | Description |
+|------|------|-------------|
+| Bunq Monetary Accounts | Action | Retrieve monetary accounts with type filtering |
+| Bunq Payments | Action | Retrieve payments with pagination and date filtering |
+| Bunq Create Payment | Action | Create actual or draft payments to any recipient |
+| Bunq Trigger | Trigger | Start workflows from Bunq webhook events |
+| Bunq Session | Utility | Manage Bunq API sessions manually |
+| Sign Request | Utility | Sign request bodies with your Bunq private key |
 
 ### Bunq Monetary Accounts
-A node that retrieves a list of Monetary Accounts from the Bunq API with type filtering. Each account is returned as a separate n8n item for easy processing in workflows.
+
+Retrieves monetary accounts from the Bunq API. Each account is returned as a separate n8n item.
 
 **Features:**
-- Multiselect option to choose which account types to retrieve
-- Returns each account as a separate n8n item
+- Multiselect filter for account types
 - Automatic session management
-- Support for all Bunq monetary account types
 
-**Account Types:**
-- **Bank**: Classic personal or business bank accounts
-- **Savings**: Regular or auto-savings accounts (including VAT accounts)
-- **Joint**: Shared accounts with other bunq users (legal co-owners)
+**Account types:**
+- **Bank** — Classic personal or business bank accounts
+- **Savings** — Regular or auto-savings accounts (including VAT accounts)
+- **Joint** — Shared accounts with other bunq users
 
 ### Bunq Payments
-A node that retrieves payments from a specific Monetary Account in the Bunq API with support for pagination and date filtering.
+
+Retrieves payments from a specific monetary account with pagination and date filtering.
 
 **Features:**
 - Fetch payments for any monetary account by ID
 - Full pagination support for large datasets
-- Date filtering to retrieve payments from the last X days
-- Option to return all results or limit to a specific number
+- Filter payments from the last X days
 - Configurable page size (up to 200 items per page)
-- Returns each payment as a separate n8n item
 
 **Parameters:**
-- **Monetary Account ID**: The ID of the account to retrieve payments from
-- **Limit** (optional): Maximum number of payments to return. If not specified, all payments are returned.
-- **Last X Days** (optional): Filter to only return payments from the last X days
-- **Items Per Page** (optional): Number of items to fetch per API request (max 200)
+- **Monetary Account ID** — The account to retrieve payments from
+- **Limit** _(optional)_ — Maximum number of payments to return; omit for all
+- **Last X Days** _(optional)_ — Only return payments from the last X days
+- **Items Per Page** _(optional)_ — Items per API request (max 200)
 
 ### Bunq Create Payment
-A node that creates payments or draft payments from a Bunq Monetary Account to any account (bunq or external).
+
+Creates payments or draft payments from a Bunq account to any recipient.
 
 **Features:**
-- Create actual payments (executed immediately) or draft payments (require manual approval)
-- Send payments to any account via IBAN, email, or phone number
-- Support for payments to:
-  - Other accounts owned by the user
-  - Other bunq users
-  - Accounts at other banks (via IBAN)
-  - Recipients identified by email or phone
-- Proper validation of payment amount, IBAN, email, and phone number formats
-- Comprehensive error handling for missing or invalid inputs
-- Clear feedback messages for payment status
+- Execute payments immediately or create drafts requiring manual approval
+- Send to any recipient via IBAN, email, or phone number
+- Validates amount, IBAN, email, and phone number formats
 
 **Parameters:**
-- **From Monetary Account ID**: The ID of the account to send money from (required)
-- **Payment Type**: Choose between "Actual Payment (Execute Immediately)" or "Draft Payment (Requires Manual Approval)" (required)
-- **Recipient Type**: Select how to identify the recipient - IBAN, Email, or Phone Number (required)
-- **Recipient IBAN/Email/Phone**: The recipient's identifier based on the selected type (required)
-- **Recipient Name**: Optional name for IBAN transfers
-- **Amount**: The amount to transfer in EUR (e.g., "10.00") (required)
-- **Description**: Description of the payment for bookkeeping purposes (required)
+- **From Monetary Account ID** — The account to send money from _(required)_
+- **Payment Type** — Actual payment or draft payment _(required)_
+- **Recipient Type** — IBAN, email, or phone number _(required)_
+- **Recipient IBAN / Email / Phone** — The recipient identifier _(required)_
+- **Recipient Name** — Optional name for IBAN transfers
+- **Amount** — Amount in EUR, e.g. `10.00` _(required)_
+- **Description** — Payment description for bookkeeping _(required)_
 
 ### Bunq Trigger
-A trigger node that starts your workflow when Bunq sends a webhook notification. The trigger automatically registers and manages webhooks with the Bunq API.
+
+Starts your workflow when Bunq sends a webhook notification. Automatically registers and cleans up webhooks with the Bunq API.
 
 **Features:**
-- Automatic webhook registration/deregistration with Bunq API
-- Support for multiple callback categories (event types)
-- Secure session management with automatic token refresh
-- Clean webhook cleanup on workflow deactivation
+- Automatic webhook registration and deregistration
+- Support for multiple callback categories
+- Automatic session token refresh
 
-**Available Callback Categories:**
-- **Billing**: Notifications for all bunq invoices
-- **bunq.me Tab**: Notifications for updates on bunq.me Tab payments
-- **Card Transaction Failed**: Notifications for failed card transactions
-- **Card Transaction Successful**: Notifications for successful card transactions
-- **Chat**: Notifications for received chat messages
-- **Draft Payment**: Notifications for creation and updates of draft payments
-- **iDEAL**: Notifications for iDEAL deposits towards a bunq account
-- **Mutation**: Notifications for any action that affects a monetary account's balance
-- **OAuth**: Notifications for revoked OAuth connections
-- **Payment**: Notifications for payments created from or received on a bunq account
-- **Request**: Notifications for incoming requests and updates on outgoing requests
-- **Schedule Result**: Notifications for when a scheduled payment is executed
-- **Schedule Status**: Notifications about the status of a scheduled payment
-- **Share**: Notifications for any updates or creation of Connects
-- **SOFORT**: Notifications for SOFORT deposits towards a bunq account
-- **Support**: Notifications for messages received through support chat
-- **Tab Result**: Notifications for updates on Tab payments
+**Available callback categories:**
+- **Billing** — Bunq invoices
+- **bunq.me Tab** — bunq.me Tab payment updates
+- **Card Transaction Failed** — Failed card transactions
+- **Card Transaction Successful** — Successful card transactions
+- **Chat** — Received chat messages
+- **Draft Payment** — Draft payment creation and updates
+- **iDEAL** — iDEAL deposits
+- **Mutation** — Any action affecting a monetary account's balance
+- **OAuth** — Revoked OAuth connections
+- **Payment** — Payments created or received
+- **Request** — Incoming requests and outgoing request updates
+- **Schedule Result** — Scheduled payment execution
+- **Schedule Status** — Scheduled payment status changes
+- **Share** — Connect creation and updates
+- **SOFORT** — SOFORT deposits
+- **Support** — Support chat messages
+- **Tab Result** — Tab payment updates
 
 ### Bunq Session
-A utility node to create and manage Bunq API sessions, including installation, device registration, and session token management.
+
+A utility node for creating and managing Bunq API sessions, including installation, device registration, and session token management. Most workflows won't need this node directly, as the other nodes handle sessions automatically.
 
 ### Sign Request
-A utility node that signs request bodies using RSA-SHA256 with your Bunq private key, useful for making authenticated API calls to Bunq.
+
+Signs request bodies using RSA-SHA256 with your Bunq private key. Useful when making custom Bunq API calls that require request signing outside of the standard nodes.
 
 ## Credentials
 
-To use these nodes, you need to set up Bunq API credentials in n8n:
-
 ### Prerequisites
+
 1. A Bunq account (production or sandbox)
 2. An API key from your Bunq account
 3. An RSA key pair (private and public keys in PEM format)
@@ -123,27 +128,19 @@ To use these nodes, you need to set up Bunq API credentials in n8n:
 1. In n8n, go to **Credentials** → **New**
 2. Search for "Bunq API" and select it
 3. Fill in the following fields:
-   - **Environment**: Choose "Sandbox" for testing or "Production" for live transactions
-   - **API Key**: Your Bunq API key
-   - **Private Key (PEM)**: Your RSA private key in PEM format
-   - **Public Key (PEM)**: Your RSA public key in PEM format
+   - **Environment** — `Sandbox` for testing, `Production` for live transactions
+   - **API Key** — Your Bunq API key
+   - **Private Key (PEM)** — Your RSA private key
+   - **Public Key (PEM)** — Your RSA public key
 4. Click **Save**
 
-### Getting your API Key
+### Getting your API key
 
-**Sandbox:**
-- Visit the [Bunq Sandbox](https://www.bunq.com/developer)
-- Create a sandbox account
-- Generate a sandbox API key
+**Sandbox:** Visit the [Bunq Developer Portal](https://www.bunq.com/developer), create a sandbox account, and generate a sandbox API key.
 
-**Production:**
-- Log in to your Bunq app
-- Go to Profile → Security & Settings → Developers
-- Generate an API key
+**Production:** In the Bunq app, go to **Profile → Security & Settings → Developers** and generate an API key.
 
-### Generating RSA Keys
-
-You can generate an RSA key pair using OpenSSL:
+### Generating RSA keys
 
 ```bash
 # Generate private key
@@ -153,13 +150,12 @@ openssl genrsa -out private.pem 2048
 openssl rsa -in private.pem -pubout -out public.pem
 ```
 
-Then copy the contents of `private.pem` and `public.pem` into the respective credential fields.
+Copy the contents of `private.pem` and `public.pem` into the respective credential fields.
 
 ## Compatibility
 
-- **Minimum n8n version**: 1.55.0
-- **Tested with**: n8n v1.55.0+
-- **Bunq API version**: v1
+- **Minimum n8n version:** 1.55.0
+- **Bunq API version:** v1
 
 ## Usage
 
@@ -167,53 +163,22 @@ Then copy the contents of `private.pem` and `public.pem` into the respective cre
 
 1. Add the **Bunq Trigger** node to your workflow
 2. Select or create your Bunq API credentials
-3. Choose one or more **Callback Categories** that you want to receive notifications for
+3. Choose one or more callback categories
 4. Activate your workflow
 
-The trigger node will:
-- Automatically register a webhook with the Bunq API
-- Start listening for incoming webhook events
-- Pass the webhook payload to the next node in your workflow
-- Clean up the webhook when the workflow is deactivated
+The node automatically registers a webhook with Bunq, passes incoming payloads to the next node, and deregisters the webhook when the workflow is deactivated.
 
-**Example workflow:**
+**Example:**
 ```
 Bunq Trigger (MUTATION) → IF Node → [Process payment data]
 ```
 
-When a mutation (balance change) occurs in your Bunq account, the trigger fires and your workflow processes the event.
-
-### Using Bunq Session
-
-The Bunq Session node helps you establish and maintain a valid session with the Bunq API. It handles:
-- Installation creation
-- Device registration  
-- Session token creation and renewal
-
-Most workflows won't need this node directly, as the Bunq Trigger handles sessions automatically.
-
 ### Using Sign Request
 
-The Sign Request node signs request bodies using your Bunq private key. This is useful when making custom API calls to Bunq that require request signing.
+Use this node when making custom HTTP calls to the Bunq API that require signed request bodies. Pass in the request body and your private key; the node returns the signature to include in your request headers.
 
 ## Resources
 
-* [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
-* [Bunq API Documentation](https://doc.bunq.com)
-* [Bunq Callbacks (Webhooks) Documentation](https://doc.bunq.com/basics/callbacks-webhooks)
-
-## Version history
-
-### 0.2.1
-- Added Bunq Create Payment node for creating payments and draft payments
-  - Support for IBAN, email, and phone number recipients
-  - Option to create actual payments or draft payments
-  - Comprehensive validation and error handling
-
-### 0.1.0
-- Initial release
-- Bunq Session node for session management
-- Sign Request node for request signing
-- Bunq Trigger node for webhook-based triggers with support for all Bunq callback categories
-- Bunq Monetary Accounts node for retrieving monetary accounts with type filtering
-- Bunq Payments node for retrieving payments with pagination and date filtering
+- [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
+- [Bunq API documentation](https://doc.bunq.com)
+- [Bunq callbacks (webhooks) documentation](https://doc.bunq.com/basics/callbacks-webhooks)
