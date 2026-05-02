@@ -9,6 +9,7 @@ import {
   ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class MonetaryAccounts implements INodeType {
@@ -150,7 +151,7 @@ export class MonetaryAccounts implements INodeType {
         // Return error data for all items if continueOnFail is enabled
         const returnData: INodeExecutionData[] = items.map((_, i) => ({
           json: {
-            error: error.message,
+            error: getErrorMessage(error),
           },
           pairedItem: {
             item: i,
