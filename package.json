@@ -47,7 +47,7 @@
         "@n8n/node-cli": "*",
         "@types/node": "^25.1.0",
         "eslint": "9.39.4",
-        "prettier": "3.8.1",
+        "prettier": "3.8.3",
         "release-it": "^20.0.0",
         "typescript": "6.0.3"
     },
