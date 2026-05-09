@@ -2,8 +2,12 @@ import {
   IExecuteFunctions,
   INodeType,
   INodeTypeDescription,
-  INodeExecutionData
+  INodeExecutionData,
+  JsonObject,
+  NodeApiError,
+  NodeConnectionTypes,
 } from 'n8n-workflow';
+import { getErrorMessage } from '../../utils/errorHelpers';
 import { signData } from '../../utils/bunqApiHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
@@ -16,11 +20,12 @@ export class SignRequest implements INodeType {
     group: ['transform'],
     version: 1,
     description: 'Signs a request body using a private key credential',
+    subtitle: 'Bunq Request Signing',
     defaults: {
       name: 'Sign Request'
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'bunqApi',
@@ -51,17 +56,35 @@ export class SignRequest implements INodeType {
     const privateKey = credentials.privateKey as string;
 
     for (let i = 0; i < items.length; i++) {
-      const body = this.getNodeParameter('body', i) as string;
+      try {
+        const body = this.getNodeParameter('body', i) as string;
 
-      // Sign with RSA-SHA256 using shared helper
-      const signature = signData(body, privateKey);
+        // Sign with RSA-SHA256 using shared helper
+        const signature = signData(body, privateKey);
 
-      returnData.push({
-        json: {
-          body,
-          signature
+        returnData.push({
+          json: {
+            body,
+            signature,
+          },
+          pairedItem: {
+            item: i,
+          },
+        });
+      } catch (error) {
+        if (this.continueOnFail()) {
+          returnData.push({
+            json: {
+              error: getErrorMessage(error),
+            },
+            pairedItem: {
+              item: i,
+            },
+          });
+        } else {
+          throw new NodeApiError(this.getNode(), error as JsonObject);
         }
-      });
+      }
     }
 
     return this.prepareOutputData(returnData);

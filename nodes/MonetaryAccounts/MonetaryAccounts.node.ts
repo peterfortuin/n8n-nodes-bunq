@@ -3,6 +3,9 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
+  JsonObject,
+  NodeApiError,
+  NodeConnectionTypes,
   NodeOperationError,
 } from 'n8n-workflow';
 import {
@@ -21,11 +24,12 @@ export class MonetaryAccounts implements INodeType {
     group: ['transform'],
     version: 1,
     description: 'Retrieve a list of Monetary Accounts from Bunq API with type filtering',
+    subtitle: 'Bunq Monetary Accounts',
     defaults: {
       name: 'Get Monetary Accounts'
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'bunqApi',
@@ -124,6 +128,9 @@ export class MonetaryAccounts implements INodeType {
       for (const account of allAccounts) {
         returnData.push({
           json: account,
+          pairedItem: {
+            item: 0,
+          },
         });
       }
 
@@ -159,7 +166,7 @@ export class MonetaryAccounts implements INodeType {
         }));
         return this.prepareOutputData(returnData);
       }
-      throw error;
+      throw new NodeApiError(this.getNode(), error as JsonObject);
     }
   }
 }

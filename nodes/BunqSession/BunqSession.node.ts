@@ -3,6 +3,9 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
+  JsonObject,
+  NodeApiError,
+  NodeConnectionTypes,
 } from 'n8n-workflow';
 import {
   ensureBunqSession,
@@ -19,11 +22,12 @@ export class BunqSession implements INodeType {
     group: ['transform'],
     version: 1,
     description: 'Create and manage Bunq API session (installation, device registration, session creation)',
+    subtitle: 'Bunq API Session',
     defaults: {
       name: 'Bunq Session'
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'bunqApi',
@@ -55,7 +59,7 @@ export class BunqSession implements INodeType {
       );
 
       // Return the session data for all items
-      const returnData: INodeExecutionData[] = items.map(() => ({
+      const returnData: INodeExecutionData[] = items.map((_, itemIndex) => ({
         json: {
           sessionToken: sessionData.sessionToken,
           installationToken: sessionData.installationToken,
@@ -64,7 +68,10 @@ export class BunqSession implements INodeType {
           sessionCreatedAt: sessionData.sessionCreatedAt,
           sessionAge: sessionData.sessionCreatedAt ? Date.now() - sessionData.sessionCreatedAt : 0,
           environment: sessionData.environment,
-        }
+        },
+        pairedItem: {
+          item: itemIndex,
+        },
       }));
 
       return this.prepareOutputData(returnData);
@@ -82,7 +89,7 @@ export class BunqSession implements INodeType {
         }));
         return this.prepareOutputData(returnData);
       }
-      throw error;
+      throw new NodeApiError(this.getNode(), error as JsonObject);
     }
   }
 }
