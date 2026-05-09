@@ -4,6 +4,7 @@ import {
 	IWebhookResponseData,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionTypes,
 	NodeApiError,
 } from 'n8n-workflow';
 import {
@@ -22,11 +23,12 @@ export class BunqTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		description: 'Starts the workflow when Bunq sends a webhook notification',
+		subtitle: 'Bunq Webhook Trigger',
 		defaults: {
 			name: 'Bunq Trigger',
 		},
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'bunqApi',

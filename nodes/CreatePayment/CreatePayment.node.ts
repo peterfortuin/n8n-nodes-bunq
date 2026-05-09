@@ -3,6 +3,8 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
+  NodeApiError,
+  NodeConnectionTypes,
   NodeOperationError,
 } from 'n8n-workflow';
 import {
@@ -30,11 +32,12 @@ export class CreatePayment implements INodeType {
     group: ['transform'],
     version: 1,
     description: 'Create a payment or draft payment from a Bunq Monetary Account to any account (bunq or external)',
+    subtitle: 'Bunq Payment Creation',
     defaults: {
       name: 'Create Payment'
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'bunqApi',
@@ -405,7 +408,9 @@ export class CreatePayment implements INodeType {
             },
           });
         } else {
-          throw error;
+          throw new NodeApiError(this.getNode(), {
+            message: getErrorMessage(error),
+          });
         }
       }
     }
