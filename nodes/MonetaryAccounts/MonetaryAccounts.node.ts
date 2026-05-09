@@ -3,7 +3,6 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
-  JsonObject,
   NodeApiError,
   NodeConnectionTypes,
   NodeOperationError,
@@ -166,7 +165,9 @@ export class MonetaryAccounts implements INodeType {
         }));
         return this.prepareOutputData(returnData);
       }
-      throw new NodeApiError(this.getNode(), error as JsonObject);
+      throw new NodeApiError(this.getNode(), {
+        message: getErrorMessage(error),
+      });
     }
   }
 }

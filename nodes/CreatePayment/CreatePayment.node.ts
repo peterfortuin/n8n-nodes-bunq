@@ -3,7 +3,6 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
-  JsonObject,
   NodeApiError,
   NodeConnectionTypes,
   NodeOperationError,
@@ -409,7 +408,9 @@ export class CreatePayment implements INodeType {
             },
           });
         } else {
-          throw new NodeApiError(this.getNode(), error as JsonObject);
+          throw new NodeApiError(this.getNode(), {
+            message: getErrorMessage(error),
+          });
         }
       }
     }
