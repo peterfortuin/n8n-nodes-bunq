@@ -134,16 +134,21 @@ export class MonetaryAccounts implements INodeType {
             message: 'No monetary accounts found for the selected types',
             accountTypes,
           },
+          pairedItem: { item: 0 },
         }]);
       }
 
-      const returnData: INodeExecutionData[] = allAccounts.map((account) => ({ json: account }));
+      const returnData: INodeExecutionData[] = allAccounts.map((account) => ({
+        json: account,
+        pairedItem: { item: 0 },
+      }));
       return this.prepareOutputData(returnData);
 
     } catch (error) {
       if (this.continueOnFail()) {
         return this.prepareOutputData([{
           json: { error: getErrorMessage(error) },
+          pairedItem: { item: 0 },
         }]);
       }
       throw new NodeApiError(this.getNode(), {
