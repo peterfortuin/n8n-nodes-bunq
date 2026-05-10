@@ -1,7 +1,7 @@
 /**
- * Safely extract a human-readable message from an unknown catch-clause value.
- * TypeScript 4.4+ (strict mode) types catch variables as `unknown`, so direct
- * access to `.message` is a type error without a guard.
+ * Safely extract a human-readable message from an arbitrary thrown or caught value.
+ * This helper performs a runtime guard before reading `.message`, which keeps
+ * error handling safe even when non-`Error` values are thrown.
  */
 export function getErrorMessage(error: unknown): string {
 	if (error instanceof Error) {
