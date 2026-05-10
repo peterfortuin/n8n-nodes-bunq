@@ -132,7 +132,7 @@ export class Payments implements INodeType {
         // Set up pagination parameters
         const itemsPerPage = additionalOptions.itemsPerPage || 50;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let allPayments: any[] = [];
+        const allPayments: any[] = [];
         let nextUrl: string | null = `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment?count=${itemsPerPage}`;
         let shouldContinue = true;
 
