@@ -3,10 +3,12 @@ import {
 	IHookFunctions,
 	INodeExecutionData,
 	IHttpRequestOptions,
+	NodeApiError,
 } from 'n8n-workflow';
 import { randomUUID } from 'crypto';
 import { signData, getBunqBaseUrl } from './bunqApiHelpers';
 import { enforceRateLimit } from './rateLimit';
+import { getErrorMessage } from './errorHelpers';
 
 // Import package version for User-Agent header
 import packageJson from '../package.json';
@@ -239,7 +241,9 @@ export class BunqHttpClient {
 		} catch (error: unknown) {
 			// Enhance error message with response details if available
 			this.enhanceErrorWithDetails(error, requestId, method, fullUrl);
-			throw error;
+			throw new NodeApiError(this.context.getNode(), {
+				message: getErrorMessage(error),
+			});
 		}
 	}
 

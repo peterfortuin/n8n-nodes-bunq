@@ -3,6 +3,8 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
+  NodeApiError,
+  NodeConnectionTypes,
   NodeOperationError,
 } from 'n8n-workflow';
 import {
@@ -21,11 +23,12 @@ export class Payments implements INodeType {
     group: ['transform'],
     version: 1,
     description: 'Retrieve payments from a Bunq Monetary Account with pagination and date filtering',
+    subtitle: 'Bunq Payment Retrieval',
     defaults: {
       name: 'Get Payments'
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'bunqApi',
@@ -184,11 +187,6 @@ export class Payments implements INodeType {
           }
         }
 
-        // Trim to limit if we collected more than needed
-        if (!returnAll && allPayments.length > limit) {
-          allPayments = allPayments.slice(0, limit);
-        }
-
         // Return each payment as a separate n8n item
         for (const payment of allPayments) {
           returnData.push({
@@ -223,7 +221,9 @@ export class Payments implements INodeType {
             },
           });
         } else {
-          throw error;
+          throw new NodeApiError(this.getNode(), {
+            message: getErrorMessage(error),
+          });
         }
       }
     }
