@@ -3,6 +3,8 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
+  NodeApiError,
+  NodeConnectionTypes,
   NodeOperationError,
 } from 'n8n-workflow';
 import {
@@ -21,11 +23,12 @@ export class MonetaryAccounts implements INodeType {
     group: ['transform'],
     version: 1,
     description: 'Retrieve a list of Monetary Accounts from Bunq API with type filtering',
+    subtitle: 'Bunq Monetary Accounts',
     defaults: {
       name: 'Get Monetary Accounts'
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'bunqApi',
@@ -60,14 +63,16 @@ export class MonetaryAccounts implements INodeType {
     ]
   };
 
+  /**
+   * This node is a node-level operation: it fetches accounts once and outputs
+   * each account as a separate item, independent of how many input items were
+   * provided. `accountTypes` is a node-level setting so it is read with index 0
+   * (the same value for every run).
+   */
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-    // This node is a node-level operation: it fetches accounts once and
-    // outputs each account as a separate item, independent of how many
-    // input items were provided.  accountTypes is a node-level setting
-    // so it is read with index 0 (the same value for every run).
-    const accountTypes = this.getNodeParameter('accountTypes', 0) as string[];
-
     try {
+      const accountTypes = this.getNodeParameter('accountTypes', 0) as string[];
+
       // Ensure we have a valid Bunq session
       const sessionData = await ensureBunqSession.call(this, false);
 
@@ -141,7 +146,9 @@ export class MonetaryAccounts implements INodeType {
           json: { error: getErrorMessage(error) },
         }]);
       }
-      throw error;
+      throw new NodeApiError(this.getNode(), {
+        message: getErrorMessage(error),
+      });
     }
   }
 }
