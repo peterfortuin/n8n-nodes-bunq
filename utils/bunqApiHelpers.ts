@@ -351,7 +351,7 @@ export async function ensureBunqSession(
           sessionData = {};
           workflowStaticData.bunqSession = sessionData;
         }
-        throw new NodeApiError(this.getNode(), error as Record<string, unknown>);
+        throw new NodeApiError(this.getNode(), { message: getErrorMessage(error) });
       }
     }
 
