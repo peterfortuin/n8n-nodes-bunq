@@ -50,6 +50,21 @@ export function signData(data: string, privateKey: string): string {
 }
 
 /**
+ * Verify a Bunq server signature using RSA-SHA256.
+ * Bunq signs the raw HTTP response/webhook body with its server private key.
+ * Returns false on any error so callers can reject the request safely.
+ */
+export function verifyBunqSignature(data: string, signature: string, serverPublicKey: string): boolean {
+  try {
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(data);
+    return verifier.verify(serverPublicKey, signature, 'base64');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Create installation with Bunq API
  * @param publicKey - The client's public key for installation
  * @returns Installation token and server public key
