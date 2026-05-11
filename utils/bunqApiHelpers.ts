@@ -16,6 +16,7 @@ import packageJson from '../package.json';
  * produces a valid session and Bunq accepts multiple concurrent sessions.
  */
 const sessionCreationLocks: Map<string, Promise<IBunqSessionData>> = new Map();
+const forceRecreateCreationLocks: Set<string> = new Set();
 
 /**
  * Type for Bunq API context - supports both execution and hook contexts
@@ -263,6 +264,14 @@ export async function ensureBunqSession(
   const workflowStaticData = this.getWorkflowStaticData('global');
   let sessionData: IBunqSessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
 
+  // If a force-recreate flow is already running, always wait for it first so
+  // callers don't return stale cached session data while credentials are being rebuilt.
+  const inFlightCreation = sessionCreationLocks.get(lockKey);
+  if (inFlightCreation && (forceRecreate || forceRecreateCreationLocks.has(lockKey))) {
+    await inFlightCreation;
+    sessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
+  }
+
   // If force recreate is true, clear all session data
   if (forceRecreate) {
     sessionData = {};
@@ -286,8 +295,9 @@ export async function ensureBunqSession(
   // this credential, wait for it and return its result.  This prevents
   // redundant installation/device/session-server calls when multiple nodes
   // or workflow runs detect an expired session at the same time.
-  if (sessionCreationLocks.has(lockKey)) {
-    return await sessionCreationLocks.get(lockKey)!;
+  const existingCreation = sessionCreationLocks.get(lockKey);
+  if (existingCreation) {
+    return await existingCreation;
   }
 
   // We are the first caller to need a session; run the creation flow and let
@@ -337,9 +347,13 @@ export async function ensureBunqSession(
   })();
 
   sessionCreationLocks.set(lockKey, creationPromise);
+  if (forceRecreate) {
+    forceRecreateCreationLocks.add(lockKey);
+  }
   try {
     return await creationPromise;
   } finally {
     sessionCreationLocks.delete(lockKey);
+    forceRecreateCreationLocks.delete(lockKey);
   }
 }
