@@ -247,8 +247,15 @@ export async function ensureBunqSession(
   const publicKey = credentials.publicKey as string;
   const environment = credentials.environment as string;
 
-  // Build a per-credential lock key (hashed to avoid logging the raw API key)
-  const credHash = crypto.createHash('sha256').update(apiKey).digest('hex').substring(0, 16);
+  // Build a per-credential lock key using the API key and public key so
+  // credentials that share an API key but use different keypairs do not
+  // share installation/session creation locks.
+  const credentialLockMaterial = `${apiKey}:${publicKey}`;
+  const credHash = crypto
+    .createHash('sha256')
+    .update(credentialLockMaterial)
+    .digest('hex')
+    .substring(0, 16);
   const lockKey = `${environment}:${credHash}`;
 
   // Get or initialize session data from workflow static data
