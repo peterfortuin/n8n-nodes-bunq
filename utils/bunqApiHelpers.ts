@@ -267,7 +267,10 @@ export async function ensureBunqSession(
   // If a force-recreate flow is already running, always wait for it first so
   // callers don't return stale cached session data while credentials are being rebuilt.
   const inFlightCreation = sessionCreationLocks.get(lockKey);
-  if (inFlightCreation && (forceRecreate || forceRecreateCreationLocks.has(lockKey))) {
+  if (inFlightCreation && forceRecreate) {
+    await inFlightCreation;
+    sessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
+  } else if (inFlightCreation && forceRecreateCreationLocks.has(lockKey)) {
     await inFlightCreation;
     sessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
   }
@@ -296,7 +299,7 @@ export async function ensureBunqSession(
   // redundant installation/device/session-server calls when multiple nodes
   // or workflow runs detect an expired session at the same time.
   const existingCreation = sessionCreationLocks.get(lockKey);
-  if (existingCreation) {
+  if (existingCreation && !forceRecreate) {
     return await existingCreation;
   }
 
