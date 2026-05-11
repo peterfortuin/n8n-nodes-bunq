@@ -1,7 +1,6 @@
 import {
 	IExecuteFunctions,
 	IHookFunctions,
-	INodeExecutionData,
 	IHttpRequestOptions,
 	NodeApiError,
 } from 'n8n-workflow';
@@ -240,32 +239,4 @@ export class BunqHttpClient {
 		}
 	}
 
-	/**
-	 * Handle errors in execute context with continueOnFail support
-	 * This method should be used in node execute() methods to handle errors appropriately
-	 */
-	handleExecuteError(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		error: any,
-		items: INodeExecutionData[],
-		continueOnFail: boolean,
-	): INodeExecutionData[] | never {
-		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-		const errorResponse = error?.response;
-
-		if (continueOnFail) {
-			const returnData: INodeExecutionData[] = items.map((_, i) => ({
-				json: {
-					error: errorMessage,
-					statusCode: errorResponse?.status,
-					responseData: errorResponse?.data,
-				},
-				pairedItem: {
-					item: i,
-				},
-			}));
-			return returnData;
-		}
-		throw error;
-	}
 }
