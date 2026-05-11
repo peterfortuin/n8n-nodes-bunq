@@ -64,14 +64,14 @@ export class CreatePayment implements INodeType {
             description: 'Payment is executed immediately',
           },
           {
-            name: 'Draft Payment (Requires Manual Approval)',
-            value: 'draft',
-            description: 'Payment is created as a draft requiring manual approval in the bunq app',
-          },
-          {
             name: 'Actual Payment with Draft Fallback',
             value: 'actualWithDraftFallback',
             description: 'Attempts an actual payment first; if that fails for any reason, automatically creates a draft payment instead',
+          },
+          {
+            name: 'Draft Payment (Requires Manual Approval)',
+            value: 'draft',
+            description: 'Payment is created as a draft requiring manual approval in the bunq app',
           },
         ],
         default: 'actual',
@@ -84,14 +84,14 @@ export class CreatePayment implements INodeType {
         type: 'options',
         options: [
           {
-            name: 'IBAN',
-            value: 'iban',
-            description: 'Recipient identified by IBAN',
-          },
-          {
             name: 'Email',
             value: 'email',
             description: 'Recipient identified by email address',
+          },
+          {
+            name: 'IBAN',
+            value: 'iban',
+            description: 'Recipient identified by IBAN',
           },
           {
             name: 'Phone Number',
