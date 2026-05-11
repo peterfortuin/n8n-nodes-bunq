@@ -61,7 +61,6 @@ export class BunqSession implements INodeType {
       const returnData: INodeExecutionData[] = items.map((_, itemIndex) => ({
         json: {
           sessionToken: sessionData.sessionToken,
-          installationToken: sessionData.installationToken,
           deviceServerId: sessionData.deviceServerId,
           userId: sessionData.userId,
           sessionCreatedAt: sessionData.sessionCreatedAt,
