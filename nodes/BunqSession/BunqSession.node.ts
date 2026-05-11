@@ -3,10 +3,13 @@ import {
   INodeType,
   INodeTypeDescription,
   INodeExecutionData,
+  NodeApiError,
+  NodeConnectionTypes,
 } from 'n8n-workflow';
 import {
   ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class BunqSession implements INodeType {
@@ -18,11 +21,12 @@ export class BunqSession implements INodeType {
     group: ['transform'],
     version: 1,
     description: 'Create and manage Bunq API session (installation, device registration, session creation)',
+    subtitle: 'Bunq API Session',
     defaults: {
       name: 'Bunq Session'
     },
-    inputs: ['main'],
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'bunqApi',
@@ -54,7 +58,7 @@ export class BunqSession implements INodeType {
       );
 
       // Return the session data for all items
-      const returnData: INodeExecutionData[] = items.map(() => ({
+      const returnData: INodeExecutionData[] = items.map((_, itemIndex) => ({
         json: {
           sessionToken: sessionData.sessionToken,
           installationToken: sessionData.installationToken,
@@ -63,7 +67,10 @@ export class BunqSession implements INodeType {
           sessionCreatedAt: sessionData.sessionCreatedAt,
           sessionAge: sessionData.sessionCreatedAt ? Date.now() - sessionData.sessionCreatedAt : 0,
           environment: sessionData.environment,
-        }
+        },
+        pairedItem: {
+          item: itemIndex,
+        },
       }));
 
       return this.prepareOutputData(returnData);
@@ -73,7 +80,7 @@ export class BunqSession implements INodeType {
         // Return error data for all items if continueOnFail is enabled
         const returnData: INodeExecutionData[] = items.map((_, i) => ({
           json: {
-            error: error.message,
+            error: getErrorMessage(error),
           },
           pairedItem: {
             item: i,
@@ -81,7 +88,9 @@ export class BunqSession implements INodeType {
         }));
         return this.prepareOutputData(returnData);
       }
-      throw error;
+      throw new NodeApiError(this.getNode(), {
+        message: getErrorMessage(error),
+      });
     }
   }
 }

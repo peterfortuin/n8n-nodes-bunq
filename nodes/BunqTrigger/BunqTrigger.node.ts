@@ -4,19 +4,14 @@ import {
 	IWebhookResponseData,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionTypes,
 	NodeApiError,
 } from 'n8n-workflow';
 import {
 	ensureBunqSession,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
-
-/**
- * Extract error message from unknown error type
- */
-function getErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : 'Unknown error';
-}
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class BunqTrigger implements INodeType {
@@ -28,11 +23,12 @@ export class BunqTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		description: 'Starts the workflow when Bunq sends a webhook notification',
+		subtitle: 'Bunq Webhook Trigger',
 		defaults: {
 			name: 'Bunq Trigger',
 		},
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'bunqApi',
@@ -230,41 +226,162 @@ export class BunqTrigger implements INodeType {
 
 				this.logger.debug(`Session established for user ID: ${sessionData.userId}`);
 
-				// Build notification filter for single category
-				const notificationFilters = [{
-					category,
-					notification_target: webhookUrl,
-				}];
+				const client = new BunqHttpClient(this);
+				const notificationFilterUrl = `/user/${sessionData.userId}/notification-filter-url`;
 
-				const payload = JSON.stringify({
-					notification_filters: notificationFilters,
-				});
-
+				// Fetch existing filters so we don't overwrite them.
+				// The Bunq API replaces the entire list on POST, so we must merge.
+				const existingFilters: Array<{ category: string; notification_target: string }> = [];
 				try {
-					this.logger.debug(`Registering webhook with Bunq API...`);
-					// Register the webhook with Bunq using canonical HTTP client
-					const client = new BunqHttpClient(this);
-					await client.request({
-						method: 'POST',
-						url: `/user/${sessionData.userId}/notification-filter-url`,
-						body: payload,
+					const existing = await client.request({
+						method: 'GET',
+						url: notificationFilterUrl,
 						sessionToken: sessionData.sessionToken,
 					});
 
+					if (existing.Response && Array.isArray(existing.Response)) {
+						for (const item of existing.Response) {
+							if (item.NotificationFilterUrl) {
+								const filters = item.NotificationFilterUrl.notification_filters || [];
+								for (const f of filters) {
+									// Skip any stale entry for the same category+URL to avoid duplicates
+									if (!(f.category === category && f.notification_target === webhookUrl)) {
+										existingFilters.push({ category: f.category, notification_target: f.notification_target });
+									}
+								}
+							}
+						}
+					}
+				} catch (error) {
+					// Because the Bunq API replaces the full server-side list on POST, proceeding
+					// without the current list would permanently delete all other existing filters.
+					const errorMessage = getErrorMessage(error);
+					this.logger.warn(
+						`Could not fetch existing notification filters, aborting registration to avoid overwriting existing filters: ${errorMessage}`,
+					);
+					throw new NodeApiError(this.getNode(), { error: errorMessage }, {
+						message:
+							'Could not retrieve existing Bunq notification filters. Aborting webhook registration to avoid overwriting existing filters.',
+						description: errorMessage,
+					});
+				}
+
+				// Append the new filter and POST the merged list.
+				// Retry once to reduce the chance of losing concurrent registrations by another trigger.
+				const MAX_RETRIES = 1;
+				for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+					const currentFilters =
+						attempt === 0
+							? existingFilters
+							: await (async () => {
+									// Re-fetch existing filters to pick up any concurrent registrations
+									const refetched: Array<{ category: string; notification_target: string }> = [];
+									try {
+										const existing = await client.request({
+											method: 'GET',
+											url: notificationFilterUrl,
+											sessionToken: sessionData.sessionToken,
+										});
+										if (existing.Response && Array.isArray(existing.Response)) {
+											for (const item of existing.Response) {
+												if (item.NotificationFilterUrl) {
+													const filters = item.NotificationFilterUrl.notification_filters || [];
+													for (const f of filters) {
+														if (
+															!(f.category === category && f.notification_target === webhookUrl)
+														) {
+															refetched.push({
+																category: f.category,
+																notification_target: f.notification_target,
+															});
+														}
+													}
+												}
+											}
+										}
+									} catch (retryError) {
+										this.logger.warn(
+											`Could not re-fetch filters on retry: ${getErrorMessage(retryError)}`,
+										);
+									}
+									return refetched;
+								})();
+
+					const mergedFilters = [...currentFilters, { category, notification_target: webhookUrl }];
+
+					const payload = JSON.stringify({
+						notification_filters: mergedFilters,
+					});
+
+					try {
+						this.logger.debug(
+							`Registering webhook with Bunq API (attempt ${attempt + 1}/${MAX_RETRIES + 1}, total filters after merge: ${mergedFilters.length})...`,
+						);
+						await client.request({
+							method: 'POST',
+							url: notificationFilterUrl,
+							body: payload,
+							sessionToken: sessionData.sessionToken,
+						});
+					} catch (postError) {
+						const message = getErrorMessage(postError);
+						this.logger.error(`Failed to register webhook: ${message}`);
+						throw new NodeApiError(
+							this.getNode(),
+							{ error: message },
+							{
+								message: 'Failed to register webhook with Bunq',
+								description: 'Could not create notification filter in Bunq API',
+							},
+						);
+					}
+
+					// Verify the filter was actually registered (to detect concurrent overwrites)
+					try {
+						const verified = await client.request({
+							method: 'GET',
+							url: notificationFilterUrl,
+							sessionToken: sessionData.sessionToken,
+						});
+						let found = false;
+						if (verified.Response && Array.isArray(verified.Response)) {
+							for (const item of verified.Response) {
+								if (item.NotificationFilterUrl) {
+									const filters = item.NotificationFilterUrl.notification_filters || [];
+									if (
+										filters.some(
+											(f: { category: string; notification_target: string }) =>
+												f.category === category && f.notification_target === webhookUrl,
+										)
+									) {
+										found = true;
+										break;
+									}
+								}
+							}
+						}
+						if (found) {
+							this.logger.info(`Successfully registered webhook for category ${category}`);
+							return true;
+						}
+						if (attempt < MAX_RETRIES) {
+							this.logger.warn(
+								`Filter not found after POST (possible concurrent overwrite), retrying...`,
+							);
+							continue;
+						}
+					} catch (verifyError) {
+						this.logger.warn(
+							`Could not verify filter registration: ${getErrorMessage(verifyError)}`,
+						);
+					}
+
+					// POST succeeded; we either confirmed the filter or couldn't verify — return success.
 					this.logger.info(`Successfully registered webhook for category ${category}`);
 					return true;
-				} catch (error) {
-					const message = getErrorMessage(error);
-					this.logger.error(`Failed to register webhook: ${message}`);
-					throw new NodeApiError(
-						this.getNode(),
-						{ error: message },
-						{
-							message: 'Failed to register webhook with Bunq',
-							description: 'Could not create notification filter in Bunq API',
-						},
-					);
 				}
+
+				return true;
 			},
 
 			async delete(this: IHookFunctions): Promise<boolean> {
