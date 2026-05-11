@@ -1,6 +1,7 @@
 import { IExecuteFunctions, IHookFunctions, NodeApiError } from 'n8n-workflow';
 import * as crypto from 'crypto';
 import { BunqHttpClient } from './BunqHttpClient';
+import { getErrorMessage } from './errorHelpers';
 import packageJson from '../package.json';
 
 /**
@@ -331,16 +332,27 @@ export async function ensureBunqSession(
       isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
 
     if (shouldCreateSession) {
-      const sessionResult = await createSession.call(
-        this,
-        sessionData.installationToken!,
-        apiKey
-      );
-      sessionData.sessionToken = sessionResult.token;
-      sessionData.sessionCreatedAt = Date.now();
-      sessionData.userId = sessionResult.userId;
-      sessionData.sessionTimeout = sessionResult.sessionTimeout;
-      workflowStaticData.bunqSession = sessionData;
+      try {
+        const sessionResult = await createSession.call(
+          this,
+          sessionData.installationToken!,
+          apiKey
+        );
+        sessionData.sessionToken = sessionResult.token;
+        sessionData.sessionCreatedAt = Date.now();
+        sessionData.userId = sessionResult.userId;
+        sessionData.sessionTimeout = sessionResult.sessionTimeout;
+        workflowStaticData.bunqSession = sessionData;
+      } catch (error) {
+        // 466 means the cached installation token is stale (sandbox reset, key
+        // rotation, or expired installation).  Clear it so the next attempt
+        // re-runs the full installation flow instead of reusing the bad token.
+        if (getErrorMessage(error).includes('status code 466') && sessionData.installationToken) {
+          sessionData = {};
+          workflowStaticData.bunqSession = sessionData;
+        }
+        throw error;
+      }
     }
 
     // Always include environment in returned session data
