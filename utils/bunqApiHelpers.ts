@@ -4,6 +4,21 @@ import { BunqHttpClient } from './BunqHttpClient';
 import packageJson from '../package.json';
 
 /**
+ * Module-level map that tracks in-progress session creation per credential.
+ * Key: "{environment}:{credentialHash}"
+ *
+ * When two workflow runs detect an expired session simultaneously, the second
+ * one waits for the first one's promise and reuses its result instead of
+ * starting a redundant (and API-quota-consuming) creation flow.
+ *
+ * Note: this lock is process-local. Multi-worker n8n deployments can still
+ * create duplicate sessions across worker boundaries, but the last writer
+ * produces a valid session and Bunq accepts multiple concurrent sessions.
+ */
+const sessionCreationLocks: Map<string, Promise<IBunqSessionData>> = new Map();
+const forceRecreateCreationLocks: Set<string> = new Set();
+
+/**
  * Type for Bunq API context - supports both execution and hook contexts
  */
 type BunqApiContext = IExecuteFunctions | IHookFunctions;
@@ -228,15 +243,36 @@ export async function ensureBunqSession(
 ): Promise<IBunqSessionData> {
   // Retrieve credentials from context
   const credentials = await this.getCredentials('bunqApi');
-  
+
   const apiKey = credentials.apiKey as string;
   const publicKey = credentials.publicKey as string;
   const environment = credentials.environment as string;
+
+  // Build a per-credential lock key using the API key and public key so
+  // credentials that share an API key but use different keypairs do not
+  // share installation/session creation locks.
+  const credentialLockMaterial = `${apiKey}:${publicKey}`;
+  const credHash = crypto
+    .createHash('sha256')
+    .update(credentialLockMaterial)
+    .digest('hex')
+    .substring(0, 16);
+  const lockKey = `${environment}:${credHash}`;
 
   // Get or initialize session data from workflow static data
   // Use 'global' scope to share session across all Bunq nodes in the workflow
   const workflowStaticData = this.getWorkflowStaticData('global');
   let sessionData: IBunqSessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
+
+  // If a force-recreate flow is already running, always wait for it first so
+  // callers don't return stale cached session data while credentials are being rebuilt.
+  const inFlightCreation = sessionCreationLocks.get(lockKey);
+  const shouldWaitForInFlightCreation =
+    forceRecreate || forceRecreateCreationLocks.has(lockKey);
+  if (inFlightCreation && shouldWaitForInFlightCreation) {
+    await inFlightCreation;
+    sessionData = workflowStaticData.bunqSession as IBunqSessionData || {};
+  }
 
   // If force recreate is true, clear all session data
   if (forceRecreate) {
@@ -244,45 +280,82 @@ export async function ensureBunqSession(
     workflowStaticData.bunqSession = sessionData;
   }
 
-  // Step 1: Create installation if needed
-  if (!sessionData.installationToken || !sessionData.serverPublicKey) {
-    const installationResult = await createInstallation.call(this, publicKey);
-    sessionData.installationToken = installationResult.token;
-    sessionData.serverPublicKey = installationResult.serverPublicKey;
-    workflowStaticData.bunqSession = sessionData;
-  }
-
-  // Step 2: Register device if needed
-  if (!sessionData.deviceServerId) {
-    const deviceId = await registerDevice.call(
-      this,
-      sessionData.installationToken!,
-      apiKey
-    );
-    sessionData.deviceServerId = deviceId;
-    workflowStaticData.bunqSession = sessionData;
-  }
-
-  // Step 3: Create session if needed or if expired
-  const shouldCreateSession = !sessionData.sessionToken ||
+  // Fast path: everything is valid and no creation needed
+  const needsInstallation = !sessionData.installationToken || !sessionData.serverPublicKey;
+  const needsDevice = !sessionData.deviceServerId;
+  const needsSession =
+    !sessionData.sessionToken ||
     !sessionData.sessionCreatedAt ||
     isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
 
-  if (shouldCreateSession) {
-    const sessionResult = await createSession.call(
-      this,
-      sessionData.installationToken!,
-      apiKey
-    );
-    sessionData.sessionToken = sessionResult.token;
-    sessionData.sessionCreatedAt = Date.now();
-    sessionData.userId = sessionResult.userId;
-    sessionData.sessionTimeout = sessionResult.sessionTimeout;
-    workflowStaticData.bunqSession = sessionData;
+  if (!needsInstallation && !needsDevice && !needsSession) {
+    sessionData.environment = environment;
+    return sessionData;
   }
 
-  // Always include environment in returned session data
-  sessionData.environment = environment;
-  
-  return sessionData;
+  // If another concurrent call is already creating/refreshing the session for
+  // this credential, wait for it and return its result.  This prevents
+  // redundant installation/device/session-server calls when multiple nodes
+  // or workflow runs detect an expired session at the same time.
+  const existingCreation = sessionCreationLocks.get(lockKey);
+  if (existingCreation && !forceRecreate) {
+    return await existingCreation;
+  }
+
+  // We are the first caller to need a session; run the creation flow and let
+  // any concurrent callers await the same promise.
+  const creationPromise = (async (): Promise<IBunqSessionData> => {
+    // Step 1: Create installation if needed
+    if (!sessionData.installationToken || !sessionData.serverPublicKey) {
+      const installationResult = await createInstallation.call(this, publicKey);
+      sessionData.installationToken = installationResult.token;
+      sessionData.serverPublicKey = installationResult.serverPublicKey;
+      workflowStaticData.bunqSession = sessionData;
+    }
+
+    // Step 2: Register device if needed
+    if (!sessionData.deviceServerId) {
+      const deviceId = await registerDevice.call(
+        this,
+        sessionData.installationToken!,
+        apiKey
+      );
+      sessionData.deviceServerId = deviceId;
+      workflowStaticData.bunqSession = sessionData;
+    }
+
+    // Step 3: Create session if needed or if expired
+    const shouldCreateSession =
+      !sessionData.sessionToken ||
+      !sessionData.sessionCreatedAt ||
+      isSessionExpired(sessionData.sessionCreatedAt, sessionData.sessionTimeout);
+
+    if (shouldCreateSession) {
+      const sessionResult = await createSession.call(
+        this,
+        sessionData.installationToken!,
+        apiKey
+      );
+      sessionData.sessionToken = sessionResult.token;
+      sessionData.sessionCreatedAt = Date.now();
+      sessionData.userId = sessionResult.userId;
+      sessionData.sessionTimeout = sessionResult.sessionTimeout;
+      workflowStaticData.bunqSession = sessionData;
+    }
+
+    // Always include environment in returned session data
+    sessionData.environment = environment;
+    return sessionData;
+  })();
+
+  sessionCreationLocks.set(lockKey, creationPromise);
+  if (forceRecreate) {
+    forceRecreateCreationLocks.add(lockKey);
+  }
+  try {
+    return await creationPromise;
+  } finally {
+    sessionCreationLocks.delete(lockKey);
+    forceRecreateCreationLocks.delete(lockKey);
+  }
 }
