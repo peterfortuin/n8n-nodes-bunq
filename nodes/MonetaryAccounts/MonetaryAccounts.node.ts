@@ -63,108 +63,97 @@ export class MonetaryAccounts implements INodeType {
     ]
   };
 
+  /**
+   * This node is a node-level operation: it fetches accounts once and outputs
+   * each account as a separate item, independent of how many input items were
+   * provided. `accountTypes` is a node-level setting so it is read with index 0
+   * (the same value for every run).
+   */
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-    const items = this.getInputData();
-    const returnData: INodeExecutionData[] = [];
+    try {
+      const accountTypes = this.getNodeParameter('accountTypes', 0) as string[];
 
-    for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-      try {
-        // Get node parameters
-        const accountTypes = this.getNodeParameter('accountTypes', itemIndex) as string[];
+      // Ensure we have a valid Bunq session
+      const sessionData = await ensureBunqSession.call(this, false);
 
-        // Ensure we have a valid Bunq session
-        const sessionData = await ensureBunqSession.call(this, false);
+      if (!sessionData.sessionToken || !sessionData.userId) {
+        throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
+      }
 
-        if (!sessionData.sessionToken || !sessionData.userId) {
-          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
+      // Create HTTP client
+      const client = new BunqHttpClient(this);
+
+      // Fetch accounts for each selected type
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allAccounts: Array<Record<string, any>> = [];
+
+      for (const accountType of accountTypes) {
+        let endpoint = '';
+
+        switch (accountType) {
+          case 'bank':
+            endpoint = `/user/${sessionData.userId}/monetary-account-bank`;
+            break;
+          case 'savings':
+            endpoint = `/user/${sessionData.userId}/monetary-account-savings`;
+            break;
+          case 'joint':
+            endpoint = `/user/${sessionData.userId}/monetary-account-joint`;
+            break;
+          default:
+            throw new NodeOperationError(this.getNode(), `Unknown account type: ${accountType}`);
         }
 
-        // Create HTTP client
-        const client = new BunqHttpClient(this);
+        // Make API request
+        const response = await client.request({
+          method: 'GET',
+          url: endpoint,
+          sessionToken: sessionData.sessionToken,
+        });
 
-        // Fetch accounts for each selected type
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const allAccounts: Array<Record<string, any>> = [];
-
-        for (const accountType of accountTypes) {
-          let endpoint = '';
-
-          switch (accountType) {
-            case 'bank':
-              endpoint = `/user/${sessionData.userId}/monetary-account-bank`;
-              break;
-            case 'savings':
-              endpoint = `/user/${sessionData.userId}/monetary-account-savings`;
-              break;
-            case 'joint':
-              endpoint = `/user/${sessionData.userId}/monetary-account-joint`;
-              break;
-            default:
-              throw new NodeOperationError(this.getNode(), `Unknown account type: ${accountType}`);
-          }
-
-          // Make API request
-          const response = await client.request({
-            method: 'GET',
-            url: endpoint,
-            sessionToken: sessionData.sessionToken,
-          });
-
-          // Extract accounts from response
-          if (response.Response && Array.isArray(response.Response)) {
-            for (const item of response.Response) {
-              // Each item is an object with the account type as the key
-              const accountKey = Object.keys(item)[0];
-              if (accountKey) {
-                const accountData = item[accountKey];
-                // Add account type to the data for clarity
-                accountData.account_type = accountType;
-                allAccounts.push(accountData);
-              }
+        // Extract accounts from response
+        if (response.Response && Array.isArray(response.Response)) {
+          for (const item of response.Response) {
+            // Each item is an object with the account type as the key
+            const accountKey = Object.keys(item)[0];
+            if (accountKey) {
+              const accountData = item[accountKey];
+              // Add account type to the data for clarity
+              accountData.account_type = accountType;
+              allAccounts.push(accountData);
             }
           }
         }
-
-        // Return each account as a separate n8n item
-        for (const account of allAccounts) {
-          returnData.push({
-            json: account,
-            pairedItem: {
-              item: itemIndex,
-            },
-          });
-        }
-
-        // If no accounts were found, return a message for this input item
-        if (allAccounts.length === 0) {
-          returnData.push({
-            json: {
-              message: 'No monetary accounts found for the selected types',
-              accountTypes,
-            },
-            pairedItem: {
-              item: itemIndex,
-            },
-          });
-        }
-      } catch (error) {
-        if (this.continueOnFail()) {
-          returnData.push({
-            json: {
-              error: getErrorMessage(error),
-            },
-            pairedItem: {
-              item: itemIndex,
-            },
-          });
-          continue;
-        }
-        throw new NodeApiError(this.getNode(), {
-          message: getErrorMessage(error),
-        });
       }
-    }
 
-    return this.prepareOutputData(returnData);
+      // Return each account as a separate n8n item.
+      // If no accounts were found, return a single informational item.
+      if (allAccounts.length === 0) {
+        return this.prepareOutputData([{
+          json: {
+            message: 'No monetary accounts found for the selected types',
+            accountTypes,
+          },
+          pairedItem: { item: 0 },
+        }]);
+      }
+
+      const returnData: INodeExecutionData[] = allAccounts.map((account) => ({
+        json: account,
+        pairedItem: { item: 0 },
+      }));
+      return this.prepareOutputData(returnData);
+
+    } catch (error) {
+      if (this.continueOnFail()) {
+        return this.prepareOutputData([{
+          json: { error: getErrorMessage(error) },
+          pairedItem: { item: 0 },
+        }]);
+      }
+      throw new NodeApiError(this.getNode(), {
+        message: getErrorMessage(error),
+      });
+    }
   }
 }
