@@ -1,375 +1,420 @@
 import {
-	IExecuteFunctions,
-	INodeType,
-	INodeTypeDescription,
-	INodeExecutionData,
-	NodeOperationError,
+  IExecuteFunctions,
+  INodeType,
+  INodeTypeDescription,
+  INodeExecutionData,
+  NodeApiError,
+  NodeConnectionTypes,
+  NodeOperationError,
 } from 'n8n-workflow';
-import { ensureBunqSession } from '../../utils/bunqApiHelpers';
+import {
+  ensureBunqSession,
+} from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 /**
  * Interface for payment counterparty (recipient)
  */
 interface ICounterparty {
-	type: string;
-	value: string;
-	name?: string;
+  type: string;
+  value: string;
+  name?: string;
 }
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class CreatePayment implements INodeType {
-	usableAsTool: boolean = true;
-	description: INodeTypeDescription = {
-		displayName: 'Bunq Create Payment',
-		name: 'createPayment',
-		icon: 'file:../../assets/Bunq-logo.svg',
-		group: ['transform'],
-		version: 1,
-		description:
-			'Create a payment or draft payment from a Bunq Monetary Account to any account (bunq or external)',
-		defaults: {
-			name: 'Create Payment',
-		},
-		inputs: ['main'],
-		outputs: ['main'],
-		credentials: [
-			{
-				name: 'bunqApi',
-				required: true,
-			},
-		],
-		properties: [
-			{
-				displayName: 'From Monetary Account ID',
-				name: 'monetaryAccountId',
-				type: 'number',
-				default: 0,
-				required: true,
-				description: 'The ID of the monetary account to send money from',
-			},
-			{
-				displayName: 'Payment Type',
-				name: 'paymentType',
-				type: 'options',
-				options: [
-					{
-						name: 'Actual Payment (Execute Immediately)',
-						value: 'actual',
-						description: 'Payment is executed immediately',
-					},
-					{
-						name: 'Draft Payment (Requires Manual Approval)',
-						value: 'draft',
-						description: 'Payment is created as a draft requiring manual approval in the bunq app',
-					},
-				],
-				default: 'actual',
-				required: true,
-				description: 'Whether to create an actual payment or a draft payment',
-			},
-			{
-				displayName: 'Recipient Type',
-				name: 'recipientType',
-				type: 'options',
-				options: [
-					{
-						name: 'IBAN',
-						value: 'iban',
-						description: 'Recipient identified by IBAN',
-					},
-					{
-						name: 'Email',
-						value: 'email',
-						description: 'Recipient identified by email address',
-					},
-					{
-						name: 'Phone Number',
-						value: 'phone',
-						description: 'Recipient identified by phone number',
-					},
-				],
-				default: 'iban',
-				required: true,
-				description: 'How to identify the recipient of the payment',
-			},
-			{
-				displayName: 'Recipient IBAN',
-				name: 'recipientIban',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						recipientType: ['iban'],
-					},
-				},
-				placeholder: 'NL91ABNA0417164300',
-				description: 'The IBAN of the recipient account',
-			},
-			{
-				displayName: 'Recipient Email',
-				name: 'recipientEmail',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						recipientType: ['email'],
-					},
-				},
-				placeholder: 'recipient@example.com',
-				description: 'The email address of the recipient',
-			},
-			{
-				displayName: 'Recipient Phone Number',
-				name: 'recipientPhone',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						recipientType: ['phone'],
-					},
-				},
-				placeholder: '+31612345678',
-				description: 'The phone number of the recipient (include country code)',
-			},
-			{
-				displayName: 'Recipient Name',
-				name: 'recipientName',
-				type: 'string',
-				default: '',
-				displayOptions: {
-					show: {
-						recipientType: ['iban'],
-					},
-				},
-				placeholder: 'John Doe',
-				description: 'The name of the recipient (optional for IBAN transfers)',
-			},
-			{
-				displayName: 'Amount',
-				name: 'amount',
-				type: 'string',
-				default: '',
-				required: true,
-				placeholder: '10.00',
-				description: 'The amount to transfer in EUR (e.g., "10.00")',
-			},
-			{
-				displayName: 'Description',
-				name: 'description',
-				type: 'string',
-				default: '',
-				required: true,
-				typeOptions: {
-					rows: 2,
-				},
-				placeholder: 'Payment description',
-				description: 'Description of the payment for bookkeeping purposes',
-			},
-		],
-	};
+  usableAsTool: boolean = true;
+  description: INodeTypeDescription = {
+    displayName: 'Bunq Create Payment',
+    name: 'createPayment',
+    icon: 'file:../../assets/Bunq-logo.svg',
+    group: ['transform'],
+    version: 1,
+    description: 'Create a payment or draft payment from a Bunq Monetary Account to any account (bunq or external)',
+    subtitle: 'Bunq Payment Creation',
+    defaults: {
+      name: 'Create Payment'
+    },
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    credentials: [
+      {
+        name: 'bunqApi',
+        required: true,
+      },
+    ],
+    properties: [
+      {
+        displayName: 'From Monetary Account ID',
+        name: 'monetaryAccountId',
+        type: 'number',
+        default: 0,
+        required: true,
+        description: 'The ID of the monetary account to send money from',
+      },
+      {
+        displayName: 'Payment Type',
+        name: 'paymentType',
+        type: 'options',
+        options: [
+          {
+            name: 'Actual Payment (Execute Immediately)',
+            value: 'actual',
+            description: 'Payment is executed immediately',
+          },
+          {
+            name: 'Draft Payment (Requires Manual Approval)',
+            value: 'draft',
+            description: 'Payment is created as a draft requiring manual approval in the bunq app',
+          },
+          {
+            name: 'Actual Payment with Draft Fallback',
+            value: 'actualWithDraftFallback',
+            description: 'Attempts an actual payment first; if that fails for any reason, automatically creates a draft payment instead',
+          },
+        ],
+        default: 'actual',
+        required: true,
+        description: 'Whether to create an actual payment, a draft payment, or attempt an actual payment with automatic fallback to draft on permission errors',
+      },
+      {
+        displayName: 'Recipient Type',
+        name: 'recipientType',
+        type: 'options',
+        options: [
+          {
+            name: 'IBAN',
+            value: 'iban',
+            description: 'Recipient identified by IBAN',
+          },
+          {
+            name: 'Email',
+            value: 'email',
+            description: 'Recipient identified by email address',
+          },
+          {
+            name: 'Phone Number',
+            value: 'phone',
+            description: 'Recipient identified by phone number',
+          },
+        ],
+        default: 'iban',
+        required: true,
+        description: 'How to identify the recipient of the payment',
+      },
+      {
+        displayName: 'Recipient IBAN',
+        name: 'recipientIban',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: {
+          show: {
+            recipientType: ['iban'],
+          },
+        },
+        placeholder: 'NL91ABNA0417164300',
+        description: 'The IBAN of the recipient account',
+      },
+      {
+        displayName: 'Recipient Email',
+        name: 'recipientEmail',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: {
+          show: {
+            recipientType: ['email'],
+          },
+        },
+        placeholder: 'recipient@example.com',
+        description: 'The email address of the recipient',
+      },
+      {
+        displayName: 'Recipient Phone Number',
+        name: 'recipientPhone',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: {
+          show: {
+            recipientType: ['phone'],
+          },
+        },
+        placeholder: '+31612345678',
+        description: 'The phone number of the recipient (include country code)',
+      },
+      {
+        displayName: 'Recipient Name',
+        name: 'recipientName',
+        type: 'string',
+        default: '',
+        displayOptions: {
+          show: {
+            recipientType: ['iban'],
+          },
+        },
+        placeholder: 'John Doe',
+        description: 'The name of the recipient (optional for IBAN transfers)',
+      },
+      {
+        displayName: 'Amount',
+        name: 'amount',
+        type: 'string',
+        default: '',
+        required: true,
+        placeholder: '10.00',
+        description: 'The amount to transfer in EUR (e.g., "10.00")',
+      },
+      {
+        displayName: 'Description',
+        name: 'description',
+        type: 'string',
+        default: '',
+        required: true,
+        typeOptions: {
+          rows: 2,
+        },
+        placeholder: 'Payment description',
+        description: 'Description of the payment for bookkeeping purposes',
+      },
+    ]
+  };
 
-	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		const items = this.getInputData();
-		const returnData: INodeExecutionData[] = [];
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
+    const returnData: INodeExecutionData[] = [];
 
-		// Process each input item
-		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-			try {
-				// Get node parameters
-				const monetaryAccountId = this.getNodeParameter('monetaryAccountId', itemIndex) as number;
-				const paymentType = this.getNodeParameter('paymentType', itemIndex) as string;
-				const recipientType = this.getNodeParameter('recipientType', itemIndex) as string;
-				const amount = this.getNodeParameter('amount', itemIndex) as string;
-				const description = this.getNodeParameter('description', itemIndex) as string;
+    // Process each input item
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+      try {
+        // Get node parameters
+        const monetaryAccountId = this.getNodeParameter('monetaryAccountId', itemIndex) as number;
+        const paymentType = this.getNodeParameter('paymentType', itemIndex) as string;
+        const recipientType = this.getNodeParameter('recipientType', itemIndex) as string;
+        const amount = this.getNodeParameter('amount', itemIndex) as string;
+        const description = this.getNodeParameter('description', itemIndex) as string;
 
-				// Validate amount format
-				const amountRegex = /^\d+(\.\d{1,2})?$/;
-				if (!amountRegex.test(amount)) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Invalid amount format: "${amount}". Please use a number with up to 2 decimal places (e.g., "10.00" or "10")`,
-					);
-				}
+        // Validate amount format
+        const amountRegex = /^\d+(\.\d{1,2})?$/;
+        if (!amountRegex.test(amount)) {
+          throw new NodeOperationError(
+            this.getNode(),
+            `Invalid amount format: "${amount}". Please use a number with up to 2 decimal places (e.g., "10.00" or "10")`,
+          );
+        }
 
-				// Validate monetary account ID
-				if (monetaryAccountId <= 0) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Invalid monetary account ID: ${monetaryAccountId}. Must be a positive number.`,
-					);
-				}
+        // Validate monetary account ID
+        if (monetaryAccountId <= 0) {
+          throw new NodeOperationError(
+            this.getNode(),
+            `Invalid monetary account ID: ${monetaryAccountId}. Must be a positive number.`,
+          );
+        }
 
-				// Get recipient information based on type
-				let recipientValue = '';
-				let recipientApiType = ''; // API type: EMAIL, PHONE_NUMBER, or IBAN
-				let recipientName = '';
+        // Get recipient information based on type
+        let recipientValue = '';
+        let recipientApiType = ''; // API type: EMAIL, PHONE_NUMBER, or IBAN
+        let recipientName = '';
 
-				switch (recipientType) {
-					case 'iban':
-						recipientValue = this.getNodeParameter('recipientIban', itemIndex) as string;
-						recipientApiType = 'IBAN';
-						recipientName = this.getNodeParameter('recipientName', itemIndex, '') as string;
+        switch (recipientType) {
+          case 'iban':
+            recipientValue = this.getNodeParameter('recipientIban', itemIndex) as string;
+            recipientApiType = 'IBAN';
+            recipientName = this.getNodeParameter('recipientName', itemIndex, '') as string;
+            
+            // Basic IBAN validation
+            if (!recipientValue || recipientValue.trim().length === 0) {
+              throw new NodeOperationError(this.getNode(), 'Recipient IBAN is required');
+            }
+            // Remove spaces from IBAN
+            recipientValue = recipientValue.replace(/\s/g, '');
+            break;
+          case 'email': {
+            recipientValue = this.getNodeParameter('recipientEmail', itemIndex) as string;
+            recipientApiType = 'EMAIL';
+            
+            if (!recipientValue || recipientValue.trim().length === 0) {
+              throw new NodeOperationError(this.getNode(), 'Recipient email is required');
+            }
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(recipientValue)) {
+              throw new NodeOperationError(
+                this.getNode(),
+                `Invalid email format: "${recipientValue}"`,
+              );
+            }
+            break;
+          }
+          case 'phone':
+            recipientValue = this.getNodeParameter('recipientPhone', itemIndex) as string;
+            recipientApiType = 'PHONE_NUMBER';
+            
+            if (!recipientValue || recipientValue.trim().length === 0) {
+              throw new NodeOperationError(this.getNode(), 'Recipient phone number is required');
+            }
+            break;
+          default:
+            throw new NodeOperationError(
+              this.getNode(),
+              `Unknown recipient type: ${recipientType}`,
+            );
+        }
 
-						// Basic IBAN validation
-						if (!recipientValue || recipientValue.trim().length === 0) {
-							throw new NodeOperationError(this.getNode(), 'Recipient IBAN is required');
-						}
-						// Remove spaces from IBAN
-						recipientValue = recipientValue.replace(/\s/g, '');
-						break;
-					case 'email': {
-						recipientValue = this.getNodeParameter('recipientEmail', itemIndex) as string;
-						recipientApiType = 'EMAIL';
+        // Ensure we have a valid Bunq session
+        const sessionData = await ensureBunqSession.call(this, false);
+        
+        if (!sessionData.sessionToken || !sessionData.userId) {
+          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
+        }
 
-						if (!recipientValue || recipientValue.trim().length === 0) {
-							throw new NodeOperationError(this.getNode(), 'Recipient email is required');
-						}
-						// Basic email validation
-						const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-						if (!emailRegex.test(recipientValue)) {
-							throw new NodeOperationError(
-								this.getNode(),
-								`Invalid email format: "${recipientValue}"`,
-							);
-						}
-						break;
-					}
-					case 'phone':
-						recipientValue = this.getNodeParameter('recipientPhone', itemIndex) as string;
-						recipientApiType = 'PHONE_NUMBER';
+        // Create HTTP client
+        const client = new BunqHttpClient(this);
 
-						if (!recipientValue || recipientValue.trim().length === 0) {
-							throw new NodeOperationError(this.getNode(), 'Recipient phone number is required');
-						}
-						break;
-					default:
-						throw new NodeOperationError(
-							this.getNode(),
-							`Unknown recipient type: ${recipientType}`,
-						);
-				}
+        // Build counterparty object with correct structure
+        const counterparty: ICounterparty = {
+          type: recipientApiType,
+          value: recipientValue,
+        };
 
-				// Ensure we have a valid Bunq session
-				const sessionData = await ensureBunqSession.call(this, false);
+        // Add name if provided (optional for all types, but especially useful for IBAN)
+        if (recipientName && recipientName.trim().length > 0) {
+          counterparty.name = recipientName.trim();
+        }
 
-				if (!sessionData.sessionToken || !sessionData.userId) {
-					throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
-				}
+        // Helper to build the actual payment request body
+        const buildActualRequestBody = () => JSON.stringify({
+          amount: {
+            value: amount,
+            currency: 'EUR',
+          },
+          counterparty_alias: counterparty,
+          description: description,
+        });
 
-				// Create HTTP client
-				const client = new BunqHttpClient(this);
+        // Helper to build the draft payment request body
+        const buildDraftRequestBody = () => JSON.stringify({
+          entries: [
+            {
+              amount: {
+                value: amount,
+                currency: 'EUR',
+              },
+              counterparty_alias: counterparty,
+              description: description,
+            },
+          ],
+          number_of_required_accepts: 1,
+        });
 
-				// Determine endpoint based on payment type
-				const endpoint =
-					paymentType === 'draft'
-						? `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/draft-payment`
-						: `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
+        // Helper to extract payment result from API response
+        const extractPaymentResult = (response: Record<string, unknown>) => {
+          if (response.Response && Array.isArray(response.Response)) {
+            for (const item of response.Response as Record<string, unknown>[]) {
+              if (item.Id) return item.Id;
+              if (item.Payment) return item.Payment;
+              if (item.DraftPayment) return item.DraftPayment;
+            }
+          }
+          return null;
+        };
 
-				// Build counterparty object with correct structure
-				const counterparty: ICounterparty = {
-					type: recipientApiType,
-					value: recipientValue,
-				};
+        let paymentResult = null;
+        let effectivePaymentType = paymentType;
 
-				// Add name if provided (optional for all types, but especially useful for IBAN)
-				if (recipientName && recipientName.trim().length > 0) {
-					counterparty.name = recipientName.trim();
-				}
+        if (paymentType === 'actualWithDraftFallback') {
+          // Try actual payment first; fall back to draft on any error
+          const actualEndpoint = `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
+          try {
+            const response = await client.request({
+              method: 'POST',
+              url: actualEndpoint,
+              body: buildActualRequestBody(),
+              sessionToken: sessionData.sessionToken,
+            });
+            paymentResult = extractPaymentResult(response);
+            effectivePaymentType = 'actual';
+          } catch (actualPaymentError) {
+            // Actual payment failed – log the error and fall back to draft payment
+            this.logger.warn('Actual payment failed, falling back to draft payment', {
+              error: getErrorMessage(actualPaymentError),
+            });
+            const draftEndpoint = `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/draft-payment`;
+            const draftResponse = await client.request({
+              method: 'POST',
+              url: draftEndpoint,
+              body: buildDraftRequestBody(),
+              sessionToken: sessionData.sessionToken,
+            });
+            paymentResult = extractPaymentResult(draftResponse);
+            effectivePaymentType = 'draft';
+          }
+        } else {
+          // Determine endpoint based on payment type
+          const endpoint = paymentType === 'draft'
+            ? `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/draft-payment`
+            : `/user/${sessionData.userId}/monetary-account/${monetaryAccountId}/payment`;
 
-				// Build payment request body - different structure for draft vs regular payments
-				const requestBody =
-					paymentType === 'draft'
-						? JSON.stringify({
-								// Draft payments use an "entries" array structure
-								entries: [
-									{
-										amount: {
-											value: amount,
-											currency: 'EUR',
-										},
-										counterparty_alias: counterparty,
-										description: description,
-									},
-								],
-								number_of_required_accepts: 1,
-							})
-						: JSON.stringify({
-								// Regular payments use direct structure
-								amount: {
-									value: amount,
-									currency: 'EUR',
-								},
-								counterparty_alias: counterparty,
-								description: description,
-							});
+          // Build payment request body - different structure for draft vs regular payments
+          const requestBody = paymentType === 'draft'
+            ? buildDraftRequestBody()
+            : buildActualRequestBody();
 
-				// Make API request to create payment
-				const response = await client.request({
-					method: 'POST',
-					url: endpoint,
-					body: requestBody,
-					sessionToken: sessionData.sessionToken,
-				});
+          // Make API request to create payment
+          const response = await client.request({
+            method: 'POST',
+            url: endpoint,
+            body: requestBody,
+            sessionToken: sessionData.sessionToken,
+          });
 
-				// Extract payment data from response
-				let paymentResult = null;
-				if (response.Response && Array.isArray(response.Response)) {
-					for (const item of response.Response) {
-						// Response can contain "Id", "Payment", or "DraftPayment" key
-						if (item.Id) {
-							// POST responses often just return an ID
-							paymentResult = item.Id;
-						} else if (item.Payment) {
-							paymentResult = item.Payment;
-						} else if (item.DraftPayment) {
-							paymentResult = item.DraftPayment;
-						}
-					}
-				}
+          paymentResult = extractPaymentResult(response);
+        }
 
-				if (!paymentResult) {
-					throw new NodeOperationError(
-						this.getNode(),
-						'Failed to extract payment data from API response',
-					);
-				}
+        if (!paymentResult) {
+          throw new NodeOperationError(
+            this.getNode(),
+            'Failed to extract payment data from API response',
+          );
+        }
 
-				// Return payment result
-				returnData.push({
-					json: {
-						success: true,
-						paymentType: paymentType,
-						payment: paymentResult,
-						message:
-							paymentType === 'draft'
-								? 'Draft payment created successfully. Please approve it in the bunq app.'
-								: 'Payment created successfully.',
-					},
-					pairedItem: {
-						item: itemIndex,
-					},
-				});
-			} catch (error) {
-				if (this.continueOnFail()) {
-					returnData.push({
-						json: {
-							success: false,
-							error: error.message,
-						},
-						pairedItem: {
-							item: itemIndex,
-						},
-					});
-				} else {
-					throw error;
-				}
-			}
-		}
+        // Return payment result
+        returnData.push({
+          json: {
+            success: true,
+            paymentType: effectivePaymentType,
+            requestedPaymentType: paymentType,
+            payment: paymentResult,
+            message: effectivePaymentType === 'draft'
+              ? 'Draft payment created successfully. Please approve it in the bunq app.'
+              : 'Payment created successfully.',
+          },
+          pairedItem: {
+            item: itemIndex,
+          },
+        });
 
-		return this.prepareOutputData(returnData);
-	}
+      } catch (error) {
+        if (this.continueOnFail()) {
+          returnData.push({
+            json: {
+              success: false,
+              error: getErrorMessage(error),
+            },
+            pairedItem: {
+              item: itemIndex,
+            },
+          });
+        } else {
+          throw new NodeApiError(this.getNode(), {
+            message: getErrorMessage(error),
+          });
+        }
+      }
+    }
+
+    return this.prepareOutputData(returnData);
+  }
 }

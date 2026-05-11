@@ -13,7 +13,7 @@ type BunqApiContext = IExecuteFunctions | IHookFunctions;
 export const RATE_LIMITS = {
 	GET: {
 		maxRequests: 3,
-		windowMs: 4000, // 3 seconds
+		windowMs: 4000, // 4 seconds
 	},
 	POST: {
 		maxRequests: 5,
@@ -30,12 +30,18 @@ export const RATE_LIMITS = {
 };
 
 /**
- * Rate limit state stored in module-level Map (process-wide)
+ * Rate limit state stored in module-level Map (process-wide).
+ *
+ * `queue` is a promise chain used as a serial FIFO queue.  Every new request
+ * appends itself to the tail of the chain so that at most one request is
+ * executing its rate-limit logic at any given time.  This prevents the race
+ * condition where multiple concurrent requests all observe `count < maxRequests`
+ * after a shared sleep resolves and simultaneously bypass the limit.
  */
 interface RateLimitState {
 	windowStart: number;
 	count: number;
-	pendingPromise: Promise<void> | null;
+	queue: Promise<void>;
 }
 
 /**
@@ -56,8 +62,62 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Core rate-limit enforcement logic executed inside the serial queue.
+ * Because this function is always awaited one-at-a-time (via the queue chain),
+ * the read-modify-write of `state.windowStart` and `state.count` is effectively
+ * single-threaded within one Node.js process.
+ */
+async function applyRateLimit(
+	state: RateLimitState,
+	rateLimit: { maxRequests: number; windowMs: number },
+	key: string,
+	ctx: BunqApiContext,
+): Promise<void> {
+	const now = Date.now();
+
+	// Reset window if it has expired
+	if (now - state.windowStart >= rateLimit.windowMs) {
+		ctx.logger.debug(`Rate limit window reset for ${key}`, {
+			oldWindowStart: state.windowStart,
+			newWindowStart: now,
+			oldCount: state.count,
+		});
+		state.windowStart = now;
+		state.count = 0;
+	}
+
+	// If the window is full, sleep until it expires then start a fresh window
+	if (state.count >= rateLimit.maxRequests) {
+		const waitMs = rateLimit.windowMs - (Date.now() - state.windowStart);
+		if (waitMs > 0) {
+			ctx.logger.debug(`Rate limit reached for ${key}, sleeping for ${waitMs}ms`, {
+				currentCount: state.count,
+				maxRequests: rateLimit.maxRequests,
+				waitMs,
+			});
+			await sleep(waitMs);
+		}
+
+		const newWindowStart = Date.now();
+		ctx.logger.debug(`Rate limit window reset after sleep for ${key}`, {
+			oldWindowStart: state.windowStart,
+			newWindowStart,
+		});
+		state.windowStart = newWindowStart;
+		state.count = 0;
+	}
+
+	// Register this request in the current window
+	state.count += 1;
+}
+
+/**
  * Enforces API rate limit for a specific endpoint and method.
  * Waits until the next request is allowed instead of throwing.
+ *
+ * Requests are serialised through a per-key promise queue so that concurrent
+ * callers never bypass the limit by simultaneously observing a "slot available"
+ * state after a shared sleep resolves.
  *
  * @param ctx - The n8n execution or hook context
  * @param method - The HTTP method (GET, POST, PUT, etc.)
@@ -121,16 +181,13 @@ export async function enforceRateLimit(
 		key = `rateLimit:bunqApi:${credentialHash}:${upperMethod}`;
 	}
 
-	// Get or initialize rate limit state from module-level Map
-	// This is process-wide storage that ensures rate limits are enforced across all workflows
-	// for the same credential, as required by Bunq API's per-API-key limits.
-	const now = Date.now();
-
+	// Initialise state for this key if not yet seen
 	if (!rateLimitState.has(key)) {
+		const now = Date.now();
 		rateLimitState.set(key, {
 			windowStart: now,
 			count: 0,
-			pendingPromise: null,
+			queue: Promise.resolve(),
 		});
 		ctx.logger.debug(`Rate limit window started for ${key}`, {
 			windowStart: now,
@@ -141,49 +198,15 @@ export async function enforceRateLimit(
 
 	const state = rateLimitState.get(key)!;
 
-	// If there's already a pending wait, chain after it to serialize requests
-	if (state.pendingPromise) {
-		await state.pendingPromise;
-	}
+	// Serial queue: append this request after all previous ones.
+	// Each new slot runs only after the previous slot has fully resolved,
+	// ensuring read-modify-write of the rate limit counters is atomic
+	// within a single process.
+	const slot = state.queue.then(() => applyRateLimit(state, rateLimit, key, ctx));
 
-	// Reset window if expired
-	if (now - state.windowStart >= rateLimit.windowMs) {
-		ctx.logger.debug(`Rate limit window reset for ${key}`, {
-			oldWindowStart: state.windowStart,
-			newWindowStart: now,
-			oldCount: state.count,
-		});
-		state.windowStart = now;
-		state.count = 0;
-	}
+	// Advance the queue tail; swallow errors so a failed slot never stalls
+	// subsequent requests.
+	state.queue = slot.catch(() => {});
 
-	// If limit reached → wait
-	if (state.count >= rateLimit.maxRequests) {
-		const waitMs = rateLimit.windowMs - (now - state.windowStart);
-
-		if (waitMs > 0) {
-			ctx.logger.debug(`Rate limit reached for ${key}, sleeping for ${waitMs}ms`, {
-				currentCount: state.count,
-				maxRequests: rateLimit.maxRequests,
-				waitMs,
-			});
-			// Create a promise for this wait and store it so other requests can chain
-			const waitPromise = sleep(waitMs);
-			state.pendingPromise = waitPromise;
-			await waitPromise;
-			state.pendingPromise = null;
-		}
-
-		// Start new window after sleeping (use current time to account for any delays)
-		const newWindowStart = Date.now();
-		ctx.logger.debug(`Rate limit window reset after sleep for ${key}`, {
-			oldWindowStart: state.windowStart,
-			newWindowStart,
-		});
-		state.windowStart = newWindowStart;
-		state.count = 0;
-	}
-
-	// Register this request
-	state.count += 1;
+	await slot;
 }

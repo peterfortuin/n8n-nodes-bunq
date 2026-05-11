@@ -1,162 +1,170 @@
 import {
-	IExecuteFunctions,
-	INodeType,
-	INodeTypeDescription,
-	INodeExecutionData,
-	NodeOperationError,
+  IExecuteFunctions,
+  INodeType,
+  INodeTypeDescription,
+  INodeExecutionData,
+  NodeApiError,
+  NodeConnectionTypes,
+  NodeOperationError,
 } from 'n8n-workflow';
-import { ensureBunqSession } from '../../utils/bunqApiHelpers';
+import {
+  ensureBunqSession,
+} from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
+import { getErrorMessage } from '../../utils/errorHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class MonetaryAccounts implements INodeType {
-	usableAsTool: boolean = true;
-	description: INodeTypeDescription = {
-		displayName: 'Bunq Monetary Accounts',
-		name: 'monetaryAccounts',
-		icon: 'file:../../assets/Bunq-logo.svg',
-		group: ['transform'],
-		version: 1,
-		description: 'Retrieve a list of Monetary Accounts from Bunq API with type filtering',
-		defaults: {
-			name: 'Get Monetary Accounts',
-		},
-		inputs: ['main'],
-		outputs: ['main'],
-		credentials: [
-			{
-				name: 'bunqApi',
-				required: true,
-			},
-		],
-		properties: [
-			{
-				displayName: 'Account Types',
-				name: 'accountTypes',
-				type: 'multiOptions',
-				default: ['bank', 'savings', 'joint'],
-				description:
-					'Select which types of monetary accounts to retrieve. Each account type has its own characteristics:<br><br><strong>Bank:</strong> Classic personal or business bank accounts<br><strong>Savings:</strong> Regular or auto-savings accounts (including VAT accounts)<br><strong>Joint:</strong> Shared accounts with other bunq users (legal co-owners).',
-				options: [
-					{
-						name: 'Bank',
-						value: 'bank',
-						description: 'Classic personal or business bank accounts',
-					},
-					{
-						name: 'Savings',
-						value: 'savings',
-						description: 'Regular or auto-savings accounts (including VAT accounts)',
-					},
-					{
-						name: 'Joint',
-						value: 'joint',
-						description: 'Shared accounts with other bunq users',
-					},
-				],
-			},
-		],
-	};
+  usableAsTool: boolean = true;
+  description: INodeTypeDescription = {
+    displayName: 'Bunq Monetary Accounts',
+    name: 'monetaryAccounts',
+    icon: 'file:../../assets/Bunq-logo.svg',
+    group: ['transform'],
+    version: 1,
+    description: 'Retrieve a list of Monetary Accounts from Bunq API with type filtering',
+    subtitle: 'Bunq Monetary Accounts',
+    defaults: {
+      name: 'Get Monetary Accounts'
+    },
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    credentials: [
+      {
+        name: 'bunqApi',
+        required: true,
+      },
+    ],
+    properties: [
+      {
+        displayName: 'Account Types',
+        name: 'accountTypes',
+        type: 'multiOptions',
+        default: ['bank', 'savings', 'joint'],
+        description: 'Select which types of monetary accounts to retrieve. Each account type has its own characteristics:<br><br><strong>Bank:</strong> Classic personal or business bank accounts<br><strong>Savings:</strong> Regular or auto-savings accounts (including VAT accounts)<br><strong>Joint:</strong> Shared accounts with other bunq users (legal co-owners).',
+        options: [
+          {
+            name: 'Bank',
+            value: 'bank',
+            description: 'Classic personal or business bank accounts',
+          },
+          {
+            name: 'Savings',
+            value: 'savings',
+            description: 'Regular or auto-savings accounts (including VAT accounts)',
+          },
+          {
+            name: 'Joint',
+            value: 'joint',
+            description: 'Shared accounts with other bunq users',
+          },
+        ],
+      },
+    ]
+  };
 
-	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		const returnData: INodeExecutionData[] = [];
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
+    const returnData: INodeExecutionData[] = [];
 
-		try {
-			// Get node parameters
-			const accountTypes = this.getNodeParameter('accountTypes', 0) as string[];
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+      try {
+        // Get node parameters
+        const accountTypes = this.getNodeParameter('accountTypes', itemIndex) as string[];
 
-			// Ensure we have a valid Bunq session
-			const sessionData = await ensureBunqSession.call(this, false);
+        // Ensure we have a valid Bunq session
+        const sessionData = await ensureBunqSession.call(this, false);
 
-			if (!sessionData.sessionToken || !sessionData.userId) {
-				throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
-			}
+        if (!sessionData.sessionToken || !sessionData.userId) {
+          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
+        }
 
-			// Create HTTP client
-			const client = new BunqHttpClient(this);
+        // Create HTTP client
+        const client = new BunqHttpClient(this);
 
-			// Fetch accounts for each selected type
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const allAccounts: Array<Record<string, any>> = [];
+        // Fetch accounts for each selected type
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const allAccounts: Array<Record<string, any>> = [];
 
-			for (const accountType of accountTypes) {
-				let endpoint = '';
+        for (const accountType of accountTypes) {
+          let endpoint = '';
 
-				switch (accountType) {
-					case 'bank':
-						endpoint = `/user/${sessionData.userId}/monetary-account-bank`;
-						break;
-					case 'savings':
-						endpoint = `/user/${sessionData.userId}/monetary-account-savings`;
-						break;
-					case 'joint':
-						endpoint = `/user/${sessionData.userId}/monetary-account-joint`;
-						break;
-					default:
-						throw new NodeOperationError(this.getNode(), `Unknown account type: ${accountType}`);
-				}
+          switch (accountType) {
+            case 'bank':
+              endpoint = `/user/${sessionData.userId}/monetary-account-bank`;
+              break;
+            case 'savings':
+              endpoint = `/user/${sessionData.userId}/monetary-account-savings`;
+              break;
+            case 'joint':
+              endpoint = `/user/${sessionData.userId}/monetary-account-joint`;
+              break;
+            default:
+              throw new NodeOperationError(this.getNode(), `Unknown account type: ${accountType}`);
+          }
 
-				// Make API request
-				const response = await client.request({
-					method: 'GET',
-					url: endpoint,
-					sessionToken: sessionData.sessionToken,
-				});
+          // Make API request
+          const response = await client.request({
+            method: 'GET',
+            url: endpoint,
+            sessionToken: sessionData.sessionToken,
+          });
 
-				// Extract accounts from response
-				if (response.Response && Array.isArray(response.Response)) {
-					for (const item of response.Response) {
-						// Each item is an object with the account type as the key
-						const accountKey = Object.keys(item)[0];
-						if (accountKey) {
-							const accountData = item[accountKey];
-							// Add account type to the data for clarity
-							accountData.account_type = accountType;
-							allAccounts.push(accountData);
-						}
-					}
-				}
-			}
+          // Extract accounts from response
+          if (response.Response && Array.isArray(response.Response)) {
+            for (const item of response.Response) {
+              // Each item is an object with the account type as the key
+              const accountKey = Object.keys(item)[0];
+              if (accountKey) {
+                const accountData = item[accountKey];
+                // Add account type to the data for clarity
+                accountData.account_type = accountType;
+                allAccounts.push(accountData);
+              }
+            }
+          }
+        }
 
-			// Return each account as a separate n8n item
-			for (const account of allAccounts) {
-				returnData.push({
-					json: account,
-				});
-			}
+        // Return each account as a separate n8n item
+        for (const account of allAccounts) {
+          returnData.push({
+            json: account,
+            pairedItem: {
+              item: itemIndex,
+            },
+          });
+        }
 
-			// If no accounts were found, return empty result for each input item
-			if (returnData.length === 0) {
-				const items = this.getInputData();
-				for (let i = 0; i < items.length; i++) {
-					returnData.push({
-						json: {
-							message: 'No monetary accounts found for the selected types',
-							accountTypes,
-						},
-						pairedItem: {
-							item: i,
-						},
-					});
-				}
-			}
+        // If no accounts were found, return a message for this input item
+        if (allAccounts.length === 0) {
+          returnData.push({
+            json: {
+              message: 'No monetary accounts found for the selected types',
+              accountTypes,
+            },
+            pairedItem: {
+              item: itemIndex,
+            },
+          });
+        }
+      } catch (error) {
+        if (this.continueOnFail()) {
+          returnData.push({
+            json: {
+              error: getErrorMessage(error),
+            },
+            pairedItem: {
+              item: itemIndex,
+            },
+          });
+          continue;
+        }
+        throw new NodeApiError(this.getNode(), {
+          message: getErrorMessage(error),
+        });
+      }
+    }
 
-			return this.prepareOutputData(returnData);
-		} catch (error) {
-			if (this.continueOnFail()) {
-				const items = this.getInputData();
-				// Return error data for all items if continueOnFail is enabled
-				const returnData: INodeExecutionData[] = items.map((_, i) => ({
-					json: {
-						error: error.message,
-					},
-					pairedItem: {
-						item: i,
-					},
-				}));
-				return this.prepareOutputData(returnData);
-			}
-			throw error;
-		}
-	}
+    return this.prepareOutputData(returnData);
+  }
 }

@@ -1,69 +1,93 @@
 import {
-	IExecuteFunctions,
-	INodeType,
-	INodeTypeDescription,
-	INodeExecutionData,
+  IExecuteFunctions,
+  INodeType,
+  INodeTypeDescription,
+  INodeExecutionData,
+  NodeApiError,
+  NodeConnectionTypes,
 } from 'n8n-workflow';
+import { getErrorMessage } from '../../utils/errorHelpers';
 import { signData } from '../../utils/bunqApiHelpers';
 
 // eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool
 export class SignRequest implements INodeType {
-	usableAsTool: boolean = true;
-	description: INodeTypeDescription = {
-		displayName: 'Bunq Signing',
-		name: 'signRequest',
-		icon: 'file:../../assets/Bunq-logo.svg',
-		group: ['transform'],
-		version: 1,
-		description: 'Signs a request body using a private key credential',
-		defaults: {
-			name: 'Sign Request',
-		},
-		inputs: ['main'],
-		outputs: ['main'],
-		credentials: [
-			{
-				name: 'bunqApi',
-				required: true,
-			},
-		],
-		properties: [
-			{
-				displayName: 'Request Body',
-				name: 'body',
-				type: 'string',
-				typeOptions: {
-					rows: 8,
-				},
-				default: '',
-				description: 'Paste the request body to be signed (any string)',
-				required: true,
-			},
-		],
-	};
+  usableAsTool: boolean = true;
+  description: INodeTypeDescription = {
+    displayName: 'Bunq Signing',
+    name: 'signRequest',
+    icon: 'file:../../assets/Bunq-logo.svg',
+    group: ['transform'],
+    version: 1,
+    description: 'Signs a request body using a private key credential',
+    subtitle: 'Bunq Request Signing',
+    defaults: {
+      name: 'Sign Request'
+    },
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    credentials: [
+      {
+        name: 'bunqApi',
+        required: true,
+      },
+    ],
+    properties: [
+      {
+        displayName: 'Request Body',
+        name: 'body',
+        type: 'string',
+        typeOptions: {
+          rows: 8,
+        },
+        default: '',
+        description: 'Paste the request body to be signed (any string)',
+        required: true,
+      }
+    ]
+  };
 
-	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		const items = this.getInputData();
-		const returnData: INodeExecutionData[] = [];
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
+    const returnData: INodeExecutionData[] = [];
 
-		// Load private key from bunqApi credential
-		const credentials = await this.getCredentials('bunqApi');
-		const privateKey = credentials.privateKey as string;
+    // Load private key from bunqApi credential
+    const credentials = await this.getCredentials('bunqApi');
+    const privateKey = credentials.privateKey as string;
 
-		for (let i = 0; i < items.length; i++) {
-			const body = this.getNodeParameter('body', i) as string;
+    for (let i = 0; i < items.length; i++) {
+      try {
+        const body = this.getNodeParameter('body', i) as string;
 
-			// Sign with RSA-SHA256 using shared helper
-			const signature = signData(body, privateKey);
+        // Sign with RSA-SHA256 using shared helper
+        const signature = signData(body, privateKey);
 
-			returnData.push({
-				json: {
-					body,
-					signature,
-				},
-			});
-		}
+        returnData.push({
+          json: {
+            body,
+            signature,
+          },
+          pairedItem: {
+            item: i,
+          },
+        });
+      } catch (error) {
+        if (this.continueOnFail()) {
+          returnData.push({
+            json: {
+              error: getErrorMessage(error),
+            },
+            pairedItem: {
+              item: i,
+            },
+          });
+        } else {
+          throw new NodeApiError(this.getNode(), {
+            message: getErrorMessage(error),
+          });
+        }
+      }
+    }
 
-		return this.prepareOutputData(returnData);
-	}
+    return this.prepareOutputData(returnData);
+  }
 }
