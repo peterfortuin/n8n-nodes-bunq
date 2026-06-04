@@ -204,7 +204,14 @@ export class CreatePayment implements INodeType {
             `Invalid amount format: "${amountInput}". Please use a positive number (e.g., "10.00" or "10.10")`,
           );
         }
-        const amount = Number.parseFloat(amountInput).toFixed(2);
+        const parsedAmount = Number.parseFloat(amountInput);
+        if (parsedAmount <= 0) {
+          throw new NodeOperationError(
+            this.getNode(),
+            `Invalid amount value: "${amountInput}". Amount must be greater than 0.`,
+          );
+        }
+        const amount = parsedAmount.toFixed(2);
 
         // Validate monetary account ID
         if (monetaryAccountId <= 0) {
