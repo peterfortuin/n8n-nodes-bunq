@@ -83,7 +83,7 @@ export class SignRequest implements INodeType {
         } else {
           throw new NodeApiError(this.getNode(), {
             message: getErrorMessage(error),
-          });
+          }, { itemIndex: i });
         }
       }
     }

@@ -203,6 +203,7 @@ export class CreatePayment implements INodeType {
           throw new NodeOperationError(
             this.getNode(),
             `Invalid amount value: "${amountInput}". Please use a positive number (e.g., "10.00" or "10.10").`,
+            { itemIndex },
           );
         }
         const amount = parsedAmount.toFixed(2);
@@ -212,6 +213,7 @@ export class CreatePayment implements INodeType {
           throw new NodeOperationError(
             this.getNode(),
             `Invalid monetary account ID: ${monetaryAccountId}. Must be a positive number.`,
+            { itemIndex },
           );
         }
 
@@ -228,7 +230,7 @@ export class CreatePayment implements INodeType {
             
             // Basic IBAN validation
             if (!recipientValue || recipientValue.trim().length === 0) {
-              throw new NodeOperationError(this.getNode(), 'Recipient IBAN is required');
+              throw new NodeOperationError(this.getNode(), 'Recipient IBAN is required', { itemIndex });
             }
             // Remove spaces from IBAN
             recipientValue = recipientValue.replace(/\s/g, '');
@@ -238,7 +240,7 @@ export class CreatePayment implements INodeType {
             recipientApiType = 'EMAIL';
             
             if (!recipientValue || recipientValue.trim().length === 0) {
-              throw new NodeOperationError(this.getNode(), 'Recipient email is required');
+              throw new NodeOperationError(this.getNode(), 'Recipient email is required', { itemIndex });
             }
             // Basic email validation
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -246,6 +248,7 @@ export class CreatePayment implements INodeType {
               throw new NodeOperationError(
                 this.getNode(),
                 `Invalid email format: "${recipientValue}"`,
+                { itemIndex },
               );
             }
             break;
@@ -255,13 +258,14 @@ export class CreatePayment implements INodeType {
             recipientApiType = 'PHONE_NUMBER';
             
             if (!recipientValue || recipientValue.trim().length === 0) {
-              throw new NodeOperationError(this.getNode(), 'Recipient phone number is required');
+              throw new NodeOperationError(this.getNode(), 'Recipient phone number is required', { itemIndex });
             }
             break;
           default:
             throw new NodeOperationError(
               this.getNode(),
               `Unknown recipient type: ${recipientType}`,
+              { itemIndex },
             );
         }
 
@@ -269,7 +273,7 @@ export class CreatePayment implements INodeType {
         const sessionData = await ensureBunqSession.call(this, false);
         
         if (!sessionData.sessionToken || !sessionData.userId) {
-          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
+          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session', { itemIndex });
         }
 
         // Create HTTP client
@@ -379,6 +383,7 @@ export class CreatePayment implements INodeType {
           throw new NodeOperationError(
             this.getNode(),
             'Failed to extract payment data from API response',
+            { itemIndex },
           );
         }
 
@@ -412,7 +417,7 @@ export class CreatePayment implements INodeType {
         } else {
           throw new NodeApiError(this.getNode(), {
             message: getErrorMessage(error),
-          });
+          }, { itemIndex });
         }
       }
     }
