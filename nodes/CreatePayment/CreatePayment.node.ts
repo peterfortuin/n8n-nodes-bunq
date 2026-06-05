@@ -165,7 +165,16 @@ export class CreatePayment implements INodeType {
         default: '',
         required: true,
         placeholder: '10.00',
-        description: 'The amount to transfer in EUR (e.g., "10.00")',
+        description: 'The amount to transfer (e.g., "10.00")',
+      },
+      {
+        displayName: 'Currency',
+        name: 'currency',
+        type: 'string',
+        default: 'EUR',
+        required: true,
+        placeholder: 'EUR',
+        description: 'ISO 4217 currency code (e.g., EUR, USD). Must match the currency of the source monetary account.',
       },
       {
         displayName: 'Description',
@@ -194,6 +203,7 @@ export class CreatePayment implements INodeType {
         const paymentType = this.getNodeParameter('paymentType', itemIndex) as string;
         const recipientType = this.getNodeParameter('recipientType', itemIndex) as string;
         const amount = this.getNodeParameter('amount', itemIndex) as string;
+        const currency = (this.getNodeParameter('currency', itemIndex) as string).trim().toUpperCase();
         const description = this.getNodeParameter('description', itemIndex) as string;
 
         // Validate amount format
@@ -202,6 +212,14 @@ export class CreatePayment implements INodeType {
           throw new NodeOperationError(
             this.getNode(),
             `Invalid amount format: "${amount}". Please use a number with up to 2 decimal places (e.g., "10.00" or "10")`,
+          );
+        }
+
+        // Validate currency (ISO 4217: 3 uppercase letters)
+        if (!/^[A-Z]{3}$/.test(currency)) {
+          throw new NodeOperationError(
+            this.getNode(),
+            `Invalid currency code: "${currency}". Please use a 3-letter ISO 4217 code (e.g., "EUR").`,
           );
         }
 
@@ -288,7 +306,7 @@ export class CreatePayment implements INodeType {
         const buildActualRequestBody = () => JSON.stringify({
           amount: {
             value: amount,
-            currency: 'EUR',
+            currency,
           },
           counterparty_alias: counterparty,
           description: description,
@@ -300,7 +318,7 @@ export class CreatePayment implements INodeType {
             {
               amount: {
                 value: amount,
-                currency: 'EUR',
+                currency,
               },
               counterparty_alias: counterparty,
               description: description,
