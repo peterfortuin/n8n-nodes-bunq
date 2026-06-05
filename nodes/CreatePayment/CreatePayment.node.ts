@@ -196,19 +196,13 @@ export class CreatePayment implements INodeType {
         const amountInput = String(this.getNodeParameter('amount', itemIndex)).trim();
         const description = this.getNodeParameter('description', itemIndex) as string;
 
-        // Validate and normalize amount format
-        const amountRegex = /^\d+(\.\d+)?$/;
-        if (!amountRegex.test(amountInput)) {
+        // Normalize amount format to two decimals
+        const normalizedAmountInput = amountInput.replace(',', '.');
+        const parsedAmount = Number(normalizedAmountInput);
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
           throw new NodeOperationError(
             this.getNode(),
-            `Invalid amount format: "${amountInput}". Please use a positive number (e.g., "10.00" or "10.10")`,
-          );
-        }
-        const parsedAmount = Number.parseFloat(amountInput);
-        if (parsedAmount <= 0) {
-          throw new NodeOperationError(
-            this.getNode(),
-            `Invalid amount value: "${amountInput}". Amount must be greater than 0.`,
+            `Invalid amount value: "${amountInput}". Please use a positive number (e.g., "10.00" or "10.10").`,
           );
         }
         const amount = parsedAmount.toFixed(2);
