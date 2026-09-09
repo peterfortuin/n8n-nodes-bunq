@@ -116,7 +116,7 @@ export class Payments implements INodeType {
         const sessionData = await ensureBunqSession.call(this, false);
 
         if (!sessionData.sessionToken || !sessionData.userId) {
-          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session');
+          throw new NodeOperationError(this.getNode(), 'Failed to establish Bunq session', { itemIndex });
         }
 
         // Create HTTP client
@@ -223,7 +223,7 @@ export class Payments implements INodeType {
         } else {
           throw new NodeApiError(this.getNode(), {
             message: getErrorMessage(error),
-          });
+          }, { itemIndex });
         }
       }
     }
