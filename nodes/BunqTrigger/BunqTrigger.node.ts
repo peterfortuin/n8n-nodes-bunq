@@ -9,6 +9,8 @@ import {
 } from 'n8n-workflow';
 import {
 	ensureBunqSession,
+	verifyBunqSignature,
+	IBunqSessionData,
 } from '../../utils/bunqApiHelpers';
 import { BunqHttpClient } from '../../utils/BunqHttpClient';
 import { getErrorMessage } from '../../utils/errorHelpers';
@@ -463,6 +465,33 @@ export class BunqTrigger implements INodeType {
 
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
 		const req = this.getRequestObject();
+
+		// Verify Bunq's server signature to reject forged webhook requests.
+		// Bunq signs the raw request body with its server private key; we verify
+		// against the server public key stored during session installation.
+		const signature = req.headers['x-bunq-server-signature'] as string | undefined;
+		const workflowStaticData = this.getWorkflowStaticData('global');
+		const sessionData = workflowStaticData.bunqSession as IBunqSessionData | undefined;
+		const serverPublicKey = sessionData?.serverPublicKey;
+
+		if (signature && serverPublicKey) {
+			// Prefer the raw body so serialisation differences don't break verification.
+			// n8n exposes rawBody on the express request when body-parser is active.
+			const rawBody: string =
+				(req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
+			if (!verifyBunqSignature(rawBody, signature, serverPublicKey)) {
+				this.logger.warn('Bunq webhook rejected: invalid server signature');
+				const res = this.getResponseObject();
+				res.status(401).send('Invalid signature');
+				return { noWebhookResponse: true };
+			}
+		} else if (signature && !serverPublicKey) {
+			// Session hasn't been established yet; log but allow through so the
+			// first real event after node activation is not silently dropped.
+			this.logger.warn(
+				'Bunq webhook: cannot verify signature — no server public key in session data',
+			);
+		}
 
 		// Return the webhook payload to the workflow
 		return {
